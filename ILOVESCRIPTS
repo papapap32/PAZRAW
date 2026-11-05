@@ -1,14 +1,15 @@
 -- ============================================
--- ULTIMATE ALL-IN-ONE HUB (SPHERE HITBOX 28, RANGE 15)
+-- ULTIMATE ALL-IN-ONE HUB — Blank GUI Shell + PAZ Logic
+-- (Hitbox Tab Added + Hitbox Target List)
 -- ============================================
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-
+local RS = RunService
 local player = Players.LocalPlayer
 
 -- ============================================
@@ -28,6 +29,7 @@ local StopCarry = ReplicatedStorage:FindFirstChild("StopCarry")
 local AcceptRequest = ReplicatedStorage:FindFirstChild("AcceptRequest") or ReplicatedStorage:FindFirstChild("AcceptCarry") or ReplicatedStorage:FindFirstChild("Accept")
 local SendRequestGui = ReplicatedStorage:FindFirstChild("SendRequestGui")
 local TogglePrompts = ReplicatedStorage:FindFirstChild("TogglePrompts")
+local RequestPrompt = ReplicatedStorage:FindFirstChild("RequestPrompt")
 
 local CombatService = ReplicatedStorage:FindFirstChild("Packages") 
     and ReplicatedStorage.Packages:FindFirstChild("Knit") 
@@ -35,1422 +37,1077 @@ local CombatService = ReplicatedStorage:FindFirstChild("Packages")
     and ReplicatedStorage.Packages.Knit.Services:FindFirstChild("CombatService")
 local RF = CombatService and CombatService:FindFirstChild("RF")
 local PunchDo = RF and RF:FindFirstChild("PunchDo")
+local BlockRF = RF and RF:FindFirstChild("Block")
+local GrabRF = RF and RF:FindFirstChild("Grab")
 
 -- ============================================
--- CONFIGURATION
+-- CONFIG
 -- ============================================
 local CONFIG = {
-    -- Pet
-    PetSpamEnabled = false,
-    PetCustomText = "GOD MODE",
-    PetTypeSpeed = 0.2,
-    TargetPet = nil,
-    PetCurrentIndex = 0,
-    PetLastUpdate = 0,
-    PetLastSentName = "",
-    
-    -- Visuals
-    EmoteLock = false,
-    SavedEmoteID = "",
-    CurrentEmoteTrack = nil,
-    AnnounceText = "Hello Server!",
-    DetentionLooping = false,
-
-    -- Defense
-    AntiHitEnabled = false,
-    AntiGrabEnabled = false,
-    AntiGrabCooldown = false,
-    AntiHit15Enabled = false,
-    AntiHit15Cooldown = false,
-    CombatBreakerEnabled = false,
-    SkyDropEnabled = false,
-    HitCount = 0,
-    MaxHits = 8,
-    SkyDropCooldown = false,
-    SkyHeight = 100,
-    SafeList = "", 
-    Cooldown = false,
-    LastHealth = 100,
-    
-    -- Combat
-    FastEmoteEnabled = false,
-    FastEmoteTrack = nil,
-    FastEmoteID = "rbxassetid://134769837801223",
-    NoSlowEnabled = false,
-    
-    -- Kill Aura
-    KillAuraEnabled = false,
-    KillAuraCPS = 2431,
-    KillAuraRange = 15, 
-    KillAuraTargetList = "",
-    KillAuraSafeList = "",
-    KillAuraVisibility = 0.5,
-    KillAuraHitboxSize = 28, -- Sphere Size 28
-
-    -- Movement
-    InfJumpEnabled = false,
-    JumpPower = 50,
-    TpWalkEnabled = false,
-    TpWalkSpeed = 50,
-    TpWalkAnim = nil,
-
-    -- Carry
-    AutoDeclineEnabled = false,
-    AutoAcceptCarry = false,
-    AutoAcceptWhitelist = "",
-    AutoAcceptBlacklist = ""
+    PetSpamEnabled=false, PetCustomText="TFK-THE FEARED KILLERS", PetTypeSpeed=0.2, TargetPet=nil, PetCurrentIndex=0, PetLastUpdate=0, PetLastSentName="",
+    EmoteLock=false, SavedEmoteID="", CurrentEmoteTrack=nil, AnnounceText="Hello Server!", DetentionLooping=false,
+    AntiHitEnabled=false, AntiGrabEnabled=false, AntiGrabCooldown=false,
+    AntiHit15Enabled=false, AntiHit15Cooldown=false, CombatBreakerEnabled=false,
+    SafeList="", Cooldown=false, LastHealth=100,
+    AntiRagEnabled=false, AntiGrabRagEnabled=false,
+    AutoBlockEnabled=false, AutoBlockConn=nil,
+    FastEmoteEnabled=false, FastEmoteTrack=nil, FastEmoteID="rbxassetid://134769837801223", NoSlowEnabled=false,
+    KillAuraEnabled=false, KillAuraCPS=2431, KillAuraRange=15, KillAuraTargetList="", KillAuraSafeList="",
+    KillAuraVisibility=0.5, KillAuraHitboxSize=28,
+    InfJumpEnabled=false, JumpPower=50, TpWalkEnabled=false, TpWalkSpeed=50, TpWalkAnim=nil,
+    AutoDeclineEnabled=false, AutoAcceptCarry=false, AutoAcceptWhitelist="", AutoAcceptBlacklist="",
+    AutoGrabEnabled=false,
+    DeathTpEnabled=false, LastDeathPos=nil,
+    SpamNotifyEnabled=false, SpamNotifyMessage="default",
+    -- New Hitbox Tab Config
+    HitboxEnabled=false, HitboxSize=28, HitboxVisibility=0.5, HitboxTargetList="",
+    antiGrabDelay = 0.2,
 }
-
 local kaClickInterval = 1 / CONFIG.KillAuraCPS
 
 -- ============================================
--- HELPER FUNCTIONS
+-- HELPERS
 -- ============================================
-local function parseList(str)
-    local t = {}
-    if str == "" then return t end
-    for w in str:gmatch("%S+") do table.insert(t, w:lower()) end
-    return t
-end
+local function parseList(str) local t={} if str=="" then return t end for w in str:gmatch("%S+") do table.insert(t,w:lower()) end return t end
+local function isTarget(n, list) if #list==0 then return true end local ln=n:lower() for _,v in ipairs(list) do if ln:find(v,1,true) then return true end end return false end
+local function isSafe(n, list) local ln=n:lower() for _,v in ipairs(list) do if ln:find(v,1,true) then return true end end return false end
+local function isSafePlayer(plr) if not plr or CONFIG.SafeList=="" then return false end for w in string.gmatch(CONFIG.SafeList,"%S+") do if string.lower(w)==string.lower(plr.Name) or string.lower(w)==string.lower(plr.DisplayName) then return true end end return false end
 
-local function isTarget(n, targetList)
-    if #targetList == 0 then return true end
-    local ln = n:lower()
-    for _, v in ipairs(targetList) do
-        if ln:find(v, 1, true) then return true end
-    end
-    return false
-end
-
-local function isSafe(n, safeList)
-    local ln = n:lower()
-    for _, v in ipairs(safeList) do
-        if ln:find(v, 1, true) then return true end
-    end
-    return false
-end
-
-local function isSafePlayer(plr)
-    if not plr or CONFIG.SafeList == "" then return false end
-    for word in string.gmatch(CONFIG.SafeList, "%S+") do
-        if string.lower(word) == string.lower(plr.Name) or string.lower(word) == string.lower(plr.DisplayName) then return true end
-    end
-    return false
-end
-
--- ============================================
--- PET LOGIC
--- ============================================
-local function findMyPet()
-    local char = player.Character
-    if char then
-        for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then return obj end
-        end
-    end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and (obj.Name:lower():find("pet") or obj:FindFirstChild("Humanoid")) then
-            local owner = obj:FindFirstChild("Owner") or obj:FindFirstChild("Player")
-            if owner and (owner.Value == player or owner.Value == player.Name or tostring(owner.Value) == player.Name) then
-                return obj
+-- Cleanup Function
+local function ResetAllHitboxes()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local sphere = hrp:FindFirstChild("KillAuraSphere")
+                if sphere then sphere:Destroy() end
+                hrp.Size = Vector3.new(2, 2, 1)
+                hrp.Transparency = 1
+                hrp.Material = Enum.Material.Plastic
+                hrp.CanCollide = true
             end
         end
     end
-    return nil
+end
+
+-- ============================================
+-- AUTO BLOCK
+-- ============================================
+local function setAutoBlock(state)
+    if not BlockRF then warn("[AutoBlock] Block remote not found") return end
+    CONFIG.AutoBlockEnabled = state
+    if state then
+        pcall(function() BlockRF:InvokeServer(true) end)
+        if CONFIG.AutoBlockConn then CONFIG.AutoBlockConn:Disconnect() end
+        CONFIG.AutoBlockConn = RunService.Heartbeat:Connect(function()
+            task.wait(1)
+            if CONFIG.AutoBlockEnabled then pcall(function() BlockRF:InvokeServer(true) end) end
+        end)
+    else
+        if CONFIG.AutoBlockConn then CONFIG.AutoBlockConn:Disconnect() CONFIG.AutoBlockConn=nil end
+        pcall(function() BlockRF:InvokeServer(false) end)
+    end
+end
+
+-- ============================================
+-- PET
+-- ============================================
+local function findMyPet()
+    local char=player.Character
+    if char then for _,o in ipairs(char:GetChildren()) do if o:IsA("Model") and o:FindFirstChild("Humanoid") then return o end end end
+    for _,o in ipairs(workspace:GetDescendants()) do
+        if o:IsA("Model") and (o.Name:lower():find("pet") or o:FindFirstChild("Humanoid")) then
+            local owner=o:FindFirstChild("Owner") or o:FindFirstChild("Player")
+            if owner and (owner.Value==player or owner.Value==player.Name or tostring(owner.Value)==player.Name) then return o end
+        end
+    end
 end
 
 RunService.Heartbeat:Connect(function()
     if not CONFIG.PetSpamEnabled or not PetRenameRequest then return end
-    local now = tick()
-    local text = CONFIG.PetCustomText
-
+    local now=tick() local text=CONFIG.PetCustomText
     if not CONFIG.TargetPet or not CONFIG.TargetPet.Parent then
-        if now - CONFIG.PetLastUpdate > 1 then CONFIG.TargetPet = findMyPet() end
+        if now-CONFIG.PetLastUpdate>1 then CONFIG.TargetPet=findMyPet() end
     end
-
-    if now - CONFIG.PetLastUpdate >= CONFIG.PetTypeSpeed then
-        CONFIG.PetLastUpdate = now
-        if CONFIG.PetCurrentIndex >= #text then
-            CONFIG.PetCurrentIndex = 0
-            CONFIG.PetLastSentName = ""
-        end
-        if CONFIG.PetCurrentIndex < #text then
-            CONFIG.PetCurrentIndex = CONFIG.PetCurrentIndex + 1
-            local displayText = string.sub(text, 1, CONFIG.PetCurrentIndex)
-            if displayText ~= CONFIG.PetLastSentName then
-                CONFIG.PetLastSentName = displayText
-                task.spawn(function()
-                    pcall(function()
-                        if CONFIG.TargetPet then PetRenameRequest:FireServer(CONFIG.TargetPet, displayText) 
-                        else PetRenameRequest:FireServer(displayText) end
-                    end)
-                end)
+    if now-CONFIG.PetLastUpdate>=CONFIG.PetTypeSpeed then
+        CONFIG.PetLastUpdate=now
+        if CONFIG.PetCurrentIndex>=#text then CONFIG.PetCurrentIndex=0 CONFIG.PetLastSentName="" end
+        if CONFIG.PetCurrentIndex<#text then
+            CONFIG.PetCurrentIndex=CONFIG.PetCurrentIndex+1
+            local d=string.sub(text,1,CONFIG.PetCurrentIndex)
+            if d~=CONFIG.PetLastSentName then
+                CONFIG.PetLastSentName=d
+                task.spawn(function() pcall(function()
+                    if CONFIG.TargetPet then PetRenameRequest:FireServer(CONFIG.TargetPet,d) else PetRenameRequest:FireServer(d) end
+                end) end)
             end
         end
     end
 end)
 
 -- ============================================
--- DEFENSE LOGIC
+-- DEFENSE
 -- ============================================
 local function doLocalTeleport(character, attackerName)
     if not CONFIG.AntiHitEnabled or not character or CONFIG.Cooldown then return end
-    local attacker = Players:FindFirstChild(attackerName)
+    local attacker=Players:FindFirstChild(attackerName)
     if not attacker or not attacker.Character or isSafePlayer(attacker) then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    CONFIG.Cooldown = true
-    local originalCFrame = hrp.CFrame
-    
+    local hrp=character:FindFirstChild("HumanoidRootPart") if not hrp then return end
+    CONFIG.Cooldown=true
+    local orig=hrp.CFrame
     if StopCarry then pcall(function() StopCarry:FireServer() end) end
-    if CarryRequest then pcall(function() CarryRequest:FireServer(attacker, 1, 0, 1, 0, 180, 0) end) end
-    if AcceptRequest then
-        for i = 1, 5 do
-            pcall(function() AcceptRequest:FireServer(attacker) end)
-            pcall(function() AcceptRequest:FireServer() end)
-            task.wait(0.05)
-        end
-    end
-    task.spawn(function()
-        task.wait(0.1)
-        if EventTeleportEvent then pcall(function() EventTeleportEvent:FireServer() end) end
-    end)
+    if CarryRequest then pcall(function() CarryRequest:FireServer(attacker,1,0,1,0,180,0) end) end
+    if AcceptRequest then for i=1,5 do pcall(function() AcceptRequest:FireServer(attacker) end) pcall(function() AcceptRequest:FireServer() end) task.wait(0.05) end end
+    task.spawn(function() task.wait(0.1) if EventTeleportEvent then pcall(function() EventTeleportEvent:FireServer() end) end end)
     task.delay(2.0, function()
-        local hum = character:FindFirstChildOfClass("Humanoid")
-        if hrp.Parent and hum and hum.Health > 0 then
-            hrp.CFrame = originalCFrame
-            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        end
+        local hum=character:FindFirstChildOfClass("Humanoid")
+        if hrp.Parent and hum and hum.Health>0 then hrp.CFrame=orig hrp.AssemblyLinearVelocity=Vector3.new(0,0,0) end
         if StopCarry then pcall(function() StopCarry:FireServer() end) end
-        task.wait(0.5)
-        CONFIG.Cooldown = false
-    end)
-end
-
-local function doSkyDrop()
-    if not CONFIG.SkyDropEnabled or not player.Character or CONFIG.SkyDropCooldown then return end
-    CONFIG.SkyDropCooldown = true
-    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
-    local originalPos = hrp.Position
-    
-    pcall(function()
-        hum.PlatformStand = false
-        hum:ChangeState(Enum.HumanoidStateType.Running)
-        hrp.CFrame = CFrame.new(originalPos + Vector3.new(0, CONFIG.SkyHeight, 0))
-        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-        task.delay(0.2, function()
-            if hrp and hrp.Parent then
-                hrp.CFrame = CFrame.new(originalPos)
-                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            end
-            CONFIG.HitCount = 0
-            task.wait(0.5)
-            CONFIG.SkyDropCooldown = false
-        end)
+        task.wait(0.5) CONFIG.Cooldown=false
     end)
 end
 
 local function preloadFastAnim()
     if not player.Character then return end
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    local animator = hum and hum:FindFirstChildOfClass("Animator")
-    
+    local hum=player.Character:FindFirstChildOfClass("Humanoid")
+    local animator=hum and hum:FindFirstChildOfClass("Animator")
     if animator then
-        local anim = Instance.new("Animation")
-        anim.AnimationId = CONFIG.FastEmoteID
-        
-        local success, track = pcall(function()
-            return animator:LoadAnimation(anim)
-        end)
-        
-        if success then
-            CONFIG.FastEmoteTrack = track
-            CONFIG.FastEmoteTrack.Priority = Enum.AnimationPriority.Action4
-        end
+        local anim=Instance.new("Animation") anim.AnimationId=CONFIG.FastEmoteID
+        local ok,track=pcall(function() return animator:LoadAnimation(anim) end)
+        if ok then CONFIG.FastEmoteTrack=track track.Priority=Enum.AnimationPriority.Action4 end
     end
 end
 
 local function preloadTpWalkAnim()
     if not player.Character then return end
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    local animator = hum and hum:FindFirstChildOfClass("Animator")
-    
+    local hum=player.Character:FindFirstChildOfClass("Humanoid")
+    local animator=hum and hum:FindFirstChildOfClass("Animator")
     if animator then
-        local anim = Instance.new("Animation")
-        anim.AnimationId = "rbxassetid://507767714"
-        
-        local success, track = pcall(function()
-            return animator:LoadAnimation(anim)
-        end)
-        
-        if success then
-            CONFIG.TpWalkAnim = track
-            CONFIG.TpWalkAnim.Priority = Enum.AnimationPriority.Movement
-        end
+        local anim=Instance.new("Animation") anim.AnimationId="rbxassetid://507767714"
+        local ok,track=pcall(function() return animator:LoadAnimation(anim) end)
+        if ok then CONFIG.TpWalkAnim=track track.Priority=Enum.AnimationPriority.Movement end
     end
+end
+
+-- ============================================
+-- NEW ANTI-GRAB
+-- ============================================
+local function setupAntiGrab(char)
+    local hum = char:WaitForChild("Humanoid", 10)
+    local hrp = char:WaitForChild("HumanoidRootPart", 10)
+    if not hum or not hrp then return end
+    hum:GetPropertyChangedSignal("PlatformStand"):Connect(function()
+        if not CONFIG.AntiGrabEnabled then return end
+        if hum.PlatformStand then
+            local originalPos = hrp.Position
+            game:GetService("ReplicatedStorage").EventInviteSystem.EventTeleportEvent:FireServer()
+            task.delay(CONFIG.antiGrabDelay, function()
+                local currentHrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if currentHrp then currentHrp.CFrame = CFrame.new(originalPos) end
+            end)
+        end
+    end)
 end
 
 local function setupCharacter(character)
     if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local humanoid=character:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        CONFIG.LastHealth = humanoid.Health
-        
-        humanoid.HealthChanged:Connect(function(newHealth)
-            if newHealth < CONFIG.LastHealth and newHealth > 0 then
-                local myHRP = character:FindFirstChild("HumanoidRootPart")
+        CONFIG.LastHealth=humanoid.Health
+        humanoid.HealthChanged:Connect(function(nh)
+            if nh<CONFIG.LastHealth and nh>0 then
+                local myHRP=character:FindFirstChild("HumanoidRootPart")
                 if myHRP then
-                    local closest, dist = nil, 30 
-                    for _, plr in ipairs(Players:GetPlayers()) do
-                        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and not isSafePlayer(plr) then
-                            local d = (plr.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude
-                            if d < dist then dist = d; closest = plr.Name end
+                    local closest,dist=nil,30
+                    for _,plr in ipairs(Players:GetPlayers()) do
+                        if plr~=player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and not isSafePlayer(plr) then
+                            local d=(plr.Character.HumanoidRootPart.Position-myHRP.Position).Magnitude
+                            if d<dist then dist=d closest=plr.Name end
                         end
                     end
-                    if closest then doLocalTeleport(character, closest) end
+                    if closest then doLocalTeleport(character,closest) end
                 end
-
                 if CONFIG.AntiHit15Enabled and not CONFIG.AntiHit15Cooldown then
-                    CONFIG.AntiHit15Cooldown = true
-                    local hrp = character:FindFirstChild("HumanoidRootPart")
+                    CONFIG.AntiHit15Cooldown=true
+                    local hrp=character:FindFirstChild("HumanoidRootPart")
                     if hrp then
-                        local originalCFrame = hrp.CFrame
-                        task.spawn(function()
-                            pcall(function()
-                                if EventTeleportEvent then EventTeleportEvent:FireServer() end
-                                if ClassTeleportEvent then ClassTeleportEvent:FireServer() end
-                                task.wait(1.5)
-                                if StopCarry then StopCarry:FireServer() end
-                                task.wait(0.1)
-                                for i = 1, 5 do
-                                    if hrp and hrp.Parent then
-                                        hrp.CFrame = originalCFrame
-                                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                                        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                                    end
-                                    task.wait(0.05)
-                                end
-                                task.wait(0.5)
-                                CONFIG.AntiHit15Cooldown = false
-                            end)
-                        end)
+                        local orig=hrp.CFrame
+                        task.spawn(function() pcall(function()
+                            if EventTeleportEvent then EventTeleportEvent:FireServer() end
+                            if ClassTeleportEvent then ClassTeleportEvent:FireServer() end
+                            task.wait(1.5)
+                            if StopCarry then StopCarry:FireServer() end
+                            task.wait(0.1)
+                            for i=1,5 do if hrp and hrp.Parent then hrp.CFrame=orig hrp.AssemblyLinearVelocity=Vector3.new(0,0,0) hrp.AssemblyAngularVelocity=Vector3.new(0,0,0) end task.wait(0.05) end
+                            task.wait(0.5) CONFIG.AntiHit15Cooldown=false
+                        end) end)
                     end
                 end
             end
-            
-            if CONFIG.SkyDropEnabled and not CONFIG.SkyDropCooldown then
-                if newHealth < CONFIG.LastHealth then
-                    CONFIG.HitCount = CONFIG.HitCount + 1
-                    if CONFIG.HitCount >= CONFIG.MaxHits then doSkyDrop() end
-                end
-            end
-            CONFIG.LastHealth = newHealth
-        end)
-
-        humanoid.StateChanged:Connect(function(oldState, newState)
-            if newState == Enum.HumanoidStateType.Ragdoll or newState == Enum.HumanoidStateType.FallingDown or newState == Enum.HumanoidStateType.PlatformStanding then
-                
-                if CONFIG.SkyDropEnabled and not CONFIG.SkyDropCooldown then
-                    doSkyDrop()
-                end
-                
-                if CONFIG.AntiGrabEnabled and not CONFIG.AntiGrabCooldown then
-                    CONFIG.AntiGrabCooldown = true
-                    local hrp = character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local originalCFrame = hrp.CFrame
-                        task.spawn(function()
-                            pcall(function()
-                                if EventTeleportEvent then EventTeleportEvent:FireServer() end
-                                if ClassTeleportEvent then ClassTeleportEvent:FireServer() end
-                                task.wait(0.15)
-                                if StopCarry then StopCarry:FireServer() end
-                                task.wait(0.1)
-                                for i = 1, 5 do
-                                    if hrp and hrp.Parent then
-                                        hrp.CFrame = originalCFrame
-                                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                                        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                                    end
-                                    task.wait(0.05)
-                                end
-                                task.wait(1.0)
-                                CONFIG.AntiGrabCooldown = false
-                            end)
-                        end)
-                    end
-                end
-            end
+            CONFIG.LastHealth=nh
         end)
     end
+    task.wait(0.2) preloadFastAnim() preloadTpWalkAnim()
+    local animator=humanoid and humanoid:FindFirstChildOfClass("Animator")
+    if animator then animator.AnimationPlayed:Connect(function(t) if t.Priority==Enum.AnimationPriority.Action or t.Priority==Enum.AnimationPriority.Core then CONFIG.SavedEmoteID=t.Animation.AnimationId end end) end
+    if humanoid then humanoid.UseJumpPower=true humanoid.JumpPower=CONFIG.JumpPower end
 
-    task.wait(0.5)
-    preloadFastAnim()
-    preloadTpWalkAnim()
-
-    local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
-    if animator then
-        animator.AnimationPlayed:Connect(function(track)
-            if track.Priority == Enum.AnimationPriority.Action or track.Priority == Enum.AnimationPriority.Core then
-                CONFIG.SavedEmoteID = track.Animation.AnimationId
-            end
-        end)
-    end
-    
-    if humanoid then
-        humanoid.UseJumpPower = true
-        humanoid.JumpPower = CONFIG.JumpPower
-    end
+    task.spawn(setupAntiGrab, character)
 end
 
-player.CharacterAdded:Connect(setupCharacter)
-if player.Character then setupCharacter(player.Character) end
+-- ============================================
+-- ARC ANTI-RAGDOLL
+-- ============================================
+local _arc_targetCFrame = CFrame.new(-502.844818, 10.1868954, -65.4427567, 0.560596228, 2.67291544e-09, -0.828089297, -2.95736768e-08, 1, -1.67928462e-08, 0.828089297, 3.39036497e-08, 0.560596228)
+local _arc_safeCFrame = _arc_targetCFrame + Vector3.new(0,1,0)
+local ArcDefaultDelay=0.1 ArcGrabDelay=3.5
+local _arc_connection,_arc_platStandConn=nil,nil
+local _arc_originalCFrame=nil _arc_hasCleanedThisRagdoll=false _arc_returnTask=nil _arc_inReturnWindow=false _arc_wasGrabbed=false
+local _arc_platform=nil _arc_platformStandConn=nil
+
+local function _arc_resetState() _arc_originalCFrame=nil _arc_returnTask=nil _arc_hasCleanedThisRagdoll=false _arc_inReturnWindow=false _arc_wasGrabbed=false end
+local function _arc_removePlatform()
+    if _arc_platformStandConn then _arc_platformStandConn:Disconnect() _arc_platformStandConn=nil end
+    if _arc_platform then pcall(function() _arc_platform:Destroy() end) _arc_platform=nil end
+end
+local function _arc_spawnPlatform(position)
+    _arc_removePlatform()
+    local W,H,D,T=16,10,16,1
+    local floorY=position.Y-3.5 local floorCY=floorY-T/2 local ceilCY=floorY+H+T/2 local innerCY=floorY+H/2
+    local model=Instance.new("Model") model.Name="ARC_SafeBox" model.Parent=workspace _arc_platform=model
+    local function mp(s,cf) local p=Instance.new("Part") p.Size=s p.CFrame=cf p.Anchored=true p.CanCollide=true p.Locked=true p.Material=Enum.Material.SmoothPlastic p.BrickColor=BrickColor.new("Medium stone grey") p.Transparency=0.4 p.Parent=model return p end
+    local cx,cz=position.X,position.Z
+    mp(Vector3.new(W,T,D),CFrame.new(cx,floorCY,cz)) mp(Vector3.new(W,T,D),CFrame.new(cx,ceilCY,cz))
+    mp(Vector3.new(W,H+T*2,T),CFrame.new(cx,innerCY,cz+D/2+T/2)) mp(Vector3.new(W,H+T*2,T),CFrame.new(cx,innerCY,cz-D/2-T/2))
+    mp(Vector3.new(T,H+T*2,D),CFrame.new(cx-W/2-T/2,innerCY,cz)) mp(Vector3.new(T,H+T*2,D),CFrame.new(cx+W/2+T/2,innerCY,cz))
+    local topY=floorY
+    _arc_platformStandConn=RS.Heartbeat:Connect(function()
+        if not _arc_platform or not _arc_platform.Parent then _arc_removePlatform() return end
+        local hrp=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp.Parent and hrp.Position.Y<topY then hrp.CFrame=CFrame.new(cx,topY+3.5,cz) hrp.AssemblyLinearVelocity=Vector3.new(0,0,0) end
+    end)
+end
+local function _arc_countDisabledMotors(char)
+    if not char then return 0,0 end
+    local total,disabled=0,0
+    for _,o in ipairs(char:GetDescendants()) do if o:IsA("Motor6D") then total+=1 if not o.Enabled then disabled+=1 end end end
+    return total,disabled
+end
+local function _arc_forceEndRagdoll(char)
+    if not char then return end
+    local hum=char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        for _,s in ipairs({Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.Physics,Enum.HumanoidStateType.FallingDown,Enum.HumanoidStateType.PlatformStanding}) do pcall(function() hum:SetStateEnabled(s,false) end) end
+        hum.PlatformStand=false hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+    for _,n in ipairs({"RagdollJoints","NoCollisions","Local Ragdoll"}) do local o=char:FindFirstChild(n) if o then o:Destroy() end end
+    for _,o in ipairs(char:GetDescendants()) do
+        if o:IsA("Motor6D") then o.Enabled=true
+        elseif (o:IsA("BaseConstraint") or o:IsA("Attachment")) and o.Name:lower():find("ragdoll") then o:Destroy() end
+    end
+end
+local function _arc_onCharacterAdded(char)
+    local hrp=char:WaitForChild("HumanoidRootPart",10) local hum=char:WaitForChild("Humanoid",10)
+    if not hrp or not hum then return end
+    if _arc_connection then _arc_connection:Disconnect() _arc_connection=nil end
+    if _arc_platStandConn then _arc_platStandConn:Disconnect() _arc_platStandConn=nil end
+    _arc_resetState()
+    if _arc_returnTask then task.cancel(_arc_returnTask) _arc_returnTask=nil end
+    task.wait(2.5)
+    if not CONFIG.AntiRagEnabled and not CONFIG.AntiGrabRagEnabled then return end
+    _arc_connection=RS.Heartbeat:Connect(function()
+        if not CONFIG.AntiRagEnabled then return end
+        if not char.Parent or not hrp.Parent then if _arc_connection then _arc_connection:Disconnect() _arc_connection=nil end return end
+        if _arc_inReturnWindow then return end
+        local total,disabled=_arc_countDisabledMotors(char)
+        local isRag=total>=12 and (disabled/total)>=0.9
+        if isRag then
+            if not _arc_originalCFrame then _arc_originalCFrame=hrp.CFrame end
+            if not _arc_hasCleanedThisRagdoll then hrp.CFrame=_arc_safeCFrame _arc_forceEndRagdoll(char) _arc_hasCleanedThisRagdoll=true end
+        else
+            if _arc_originalCFrame and not _arc_returnTask then
+                _arc_inReturnWindow=true local saved=_arc_originalCFrame
+                _arc_returnTask=task.delay(ArcDefaultDelay,function()
+                    if hrp and hrp.Parent and saved then hrp.CFrame=saved task.delay(0.05,function() if hrp and hrp.Parent then hrp.AssemblyLinearVelocity=Vector3.new(0,-1,0) end end) end
+                    _arc_resetState()
+                end)
+            end
+            _arc_hasCleanedThisRagdoll=false
+        end
+    end)
+end
+local function startARC() local c=player.Character if c then task.spawn(_arc_onCharacterAdded,c) end end
+local function stopARC() if not CONFIG.AntiRagEnabled and not CONFIG.AntiGrabRagEnabled then
+    if _arc_connection then _arc_connection:Disconnect() _arc_connection=nil end
+    if _arc_platStandConn then _arc_platStandConn:Disconnect() _arc_platStandConn=nil end
+    _arc_removePlatform() end end
 
 -- ============================================
--- COMBAT LOGIC
+-- DEATH TP
+-- ============================================
+local function setupDeathTp(char)
+    local hrp=char:WaitForChild("HumanoidRootPart",10) local hum=char:WaitForChild("Humanoid",10)
+    if not hrp or not hum then return end
+    hum.Died:Connect(function() if CONFIG.DeathTpEnabled then CONFIG.LastDeathPos=hrp.CFrame end end)
+end
+
+player.CharacterAdded:Connect(function(nc)
+    setupCharacter(nc) task.spawn(setupDeathTp,nc) task.spawn(_arc_onCharacterAdded,nc)
+    if CONFIG.DeathTpEnabled and CONFIG.LastDeathPos then task.wait(0) local h=nc:FindFirstChild("HumanoidRootPart") if h then h.CFrame=CONFIG.LastDeathPos end end
+end)
+if player.Character then setupCharacter(player.Character) task.spawn(setupDeathTp,player.Character) end
+
+-- ============================================
+-- COMBAT LOOPS
 -- ============================================
 RunService.Heartbeat:Connect(function()
     if CONFIG.CombatBreakerEnabled and player.Character then
-        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        
+        local hrp=player.Character:FindFirstChild("HumanoidRootPart") local hum=player.Character:FindFirstChildOfClass("Humanoid")
         if hrp and hum then
-            local oldCF = hrp.CFrame
-            local oldOffset = hum.CameraOffset
-            
-            local hideCF = oldCF * CFrame.new(0, -200000, 0)
-            hrp.CFrame = hideCF
-            hum.CameraOffset = hideCF:ToObjectSpace(CFrame.new(oldCF.Position)).Position
-            
+            local ocf=hrp.CFrame local oo=hum.CameraOffset
+            local hc=ocf*CFrame.new(0,-200000,0)
+            hrp.CFrame=hc hum.CameraOffset=hc:ToObjectSpace(CFrame.new(ocf.Position)).Position
             RunService.RenderStepped:Wait()
-            
-            hrp.CFrame = oldCF
-            hum.CameraOffset = oldOffset
+            hrp.CFrame=ocf hum.CameraOffset=oo
         end
     end
 end)
 
 RunService.RenderStepped:Connect(function()
     if not CONFIG.FastEmoteEnabled or not player.Character then return end
-    
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    local animator = hum and hum:FindFirstChildOfClass("Animator")
-    
-    if animator then
+    local hum=player.Character:FindFirstChildOfClass("Humanoid") local an=hum and hum:FindFirstChildOfClass("Animator")
+    if an then
         if not CONFIG.FastEmoteTrack then preloadFastAnim() end
-        
         if CONFIG.FastEmoteTrack then
-            if not CONFIG.FastEmoteTrack.IsPlaying then
-                CONFIG.FastEmoteTrack:Play()
-            end
-            
-            local length = CONFIG.FastEmoteTrack.Length
-            local timePos = CONFIG.FastEmoteTrack.TimePosition
-            
-            if timePos < 1 then
-                CONFIG.FastEmoteTrack:AdjustSpeed(5) 
-            elseif timePos > (length - 1) then
-                CONFIG.FastEmoteTrack:AdjustSpeed(5)
-            else
-                CONFIG.FastEmoteTrack:AdjustSpeed(1)
-            end
-            
-            if timePos >= (length - 0.05) then
-                CONFIG.FastEmoteTrack.TimePosition = 0
-            end
+            if not CONFIG.FastEmoteTrack.IsPlaying then CONFIG.FastEmoteTrack:Play() end
+            local l=CONFIG.FastEmoteTrack.Length local t=CONFIG.FastEmoteTrack.TimePosition
+            if t<1 or t>(l-1) then CONFIG.FastEmoteTrack:AdjustSpeed(5) else CONFIG.FastEmoteTrack:AdjustSpeed(1) end
+            if t>=(l-0.05) then CONFIG.FastEmoteTrack.TimePosition=0 end
         end
     end
 end)
 
 RunService.Heartbeat:Connect(function()
     if not CONFIG.NoSlowEnabled or not player.Character then return end
-    
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-    
-    if humanoid and hrp then
-        humanoid.WalkSpeed = 16
-        humanoid.JumpPower = 50
-        
-        if humanoid.PlatformStand == true then
-            humanoid.PlatformStand = false
-        end
-        
-        if hrp.AssemblyLinearVelocity.Magnitude > 0 and humanoid.WalkSpeed < 10 then
-            humanoid.WalkSpeed = 16
-        end
-    end
+    local h=player.Character:FindFirstChildOfClass("Humanoid") local hrp=player.Character:FindFirstChild("HumanoidRootPart")
+    if h and hrp then h.WalkSpeed=16 h.JumpPower=50 if h.PlatformStand then h.PlatformStand=false end if hrp.AssemblyLinearVelocity.Magnitude>0 and h.WalkSpeed<10 then h.WalkSpeed=16 end end
 end)
 
 local function doClick()
     if VirtualInputManager then
-        local viewport = workspace.CurrentCamera.ViewportSize
-        local x = viewport.X / 2
-        local y = viewport.Y / 2
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
-        task.wait(0.0001)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        local vp=workspace.CurrentCamera.ViewportSize local x=vp.X/2 local y=vp.Y/2
+        VirtualInputManager:SendMouseButtonEvent(x,y,0,true,game,1) task.wait(0.0001) VirtualInputManager:SendMouseButtonEvent(x,y,0,false,game,1)
     end
 end
 
--- KILL AURA (15 STUD RANGE, SPHERE HITBOX 28)
+-- KILL AURA
 task.spawn(function()
     while task.wait() do
         if CONFIG.KillAuraEnabled then
-            local targetList = parseList(CONFIG.KillAuraTargetList)
-            local safeList = parseList(CONFIG.KillAuraSafeList)
+            local tl=parseList(CONFIG.KillAuraTargetList) local sl=parseList(CONFIG.KillAuraSafeList)
+            local myChar=player.Character local myHRP=myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local ct=nil cd=CONFIG.KillAuraRange
+            if myHRP then for _,p in ipairs(Players:GetPlayers()) do
+                if p~=player and p.Character then
+                    local hrp=p.Character:FindFirstChild("HumanoidRootPart") local h=p.Character:FindFirstChildOfClass("Humanoid")
+                    if hrp and h and h.Health>0 then
+                        local wl=isSafe(p.Name,sl) or isSafe(p.DisplayName,sl) local it=isTarget(p.Name,tl) or isTarget(p.DisplayName,tl)
+                        if not wl and it then local d=(hrp.Position-myHRP.Position).Magnitude if d<=cd then cd=d ct=p end end
+                    end
+                end
+            end end
+            for _,p in ipairs(Players:GetPlayers()) do
+                if p~=player and p.Character then
+                    local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local om=hrp:FindFirstChild("KillAuraSphere") if om then om:Destroy() end
+                        if p==ct then
+                            hrp.Size=Vector3.new(CONFIG.KillAuraHitboxSize,CONFIG.KillAuraHitboxSize,CONFIG.KillAuraHitboxSize)
+                            hrp.Transparency=CONFIG.KillAuraVisibility hrp.BrickColor=BrickColor.new("Really red") hrp.Material=Enum.Material.ForceField hrp.CanCollide=false
+                            local s=Instance.new("SpecialMesh") s.MeshType=Enum.MeshType.Sphere s.Name="KillAuraSphere" s.Parent=hrp
+                        else hrp.Size=Vector3.new(2,2,1) hrp.Transparency=1 end
+                    end
+                end
+            end
+            if ct then doClick() task.wait(kaClickInterval) else task.wait(0.1) end
+        else task.wait(0.1) end
+    end
+end)
+
+-- NEW HITBOX (EXACT COPY OF KILL AURA + TARGET LIST)
+task.spawn(function()
+    while task.wait() do
+        if CONFIG.HitboxEnabled then
+            local tl=parseList(CONFIG.HitboxTargetList) 
+            local sl=parseList(CONFIG.KillAuraSafeList)
+            local myChar=player.Character 
+            local myHRP=myChar and myChar:FindFirstChild("HumanoidRootPart")
+            local ct=nil 
+            cd=math.huge
             
-            local myChar = player.Character
-            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            local closestTarget = nil
-            local closestDist = CONFIG.KillAuraRange -- 15
-            
-            -- 1. Find the closest player within 15 studs
-            if myHRP then
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= player and p.Character then
-                        local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-                        local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                        
-                        if hrp and hum and hum.Health > 0 then
-                            local isWhitelisted = isSafe(p.Name, safeList) or isSafe(p.DisplayName, safeList)
-                            local isInTargetList = isTarget(p.Name, targetList) or isTarget(p.DisplayName, targetList)
+            if myHRP then 
+                for _,p in ipairs(Players:GetPlayers()) do
+                    if p~=player and p.Character then
+                        local hrp=p.Character:FindFirstChild("HumanoidRootPart") 
+                        local h=p.Character:FindFirstChildOfClass("Humanoid")
+                        if hrp and h and h.Health>0 then
+                            local wl=isSafe(p.Name,sl) or isSafe(p.DisplayName,sl) 
+                            local it=isTarget(p.Name,tl) or isTarget(p.DisplayName,tl)
                             
-                            if not isWhitelisted and isInTargetList then
-                                local dist = (hrp.Position - myHRP.Position).Magnitude
-                                if dist <= closestDist then
-                                    closestDist = dist
-                                    closestTarget = p
+                            if not wl and it then 
+                                local d=(hrp.Position-myHRP.Position).Magnitude 
+                                if #tl==0 then 
+                                    ct=p 
+                                else 
+                                    if d<=cd then cd=d ct=p end 
                                 end
+                            end
+                        end
+                    end
+                end 
+            end
+            
+            for _,p in ipairs(Players:GetPlayers()) do
+                if p~=player and p.Character then
+                    local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local om=hrp:FindFirstChild("KillAuraSphere") if om then om:Destroy() end
+                        local shouldExpand = false
+                        if #tl == 0 then
+                            local wl=isSafe(p.Name,sl) or isSafe(p.DisplayName,sl) 
+                            local it=isTarget(p.Name,tl) or isTarget(p.DisplayName,tl)
+                            if not wl and it then shouldExpand = true end
+                        else
+                            if p == ct then shouldExpand = true end
+                        end
+
+                        if shouldExpand then
+                            hrp.Size=Vector3.new(CONFIG.HitboxSize,CONFIG.HitboxSize,CONFIG.HitboxSize)
+                            hrp.Transparency=CONFIG.HitboxVisibility 
+                            hrp.BrickColor=BrickColor.new("Really red") 
+                            hrp.Material=Enum.Material.ForceField 
+                            hrp.CanCollide=false
+                            local s=Instance.new("SpecialMesh") s.MeshType=Enum.MeshType.Sphere s.Name="KillAuraSphere" s.Parent=hrp
+                        else 
+                            if not (CONFIG.KillAuraEnabled and p == ct) then
+                                hrp.Size=Vector3.new(2,2,1) 
+                                hrp.Transparency=1 
                             end
                         end
                     end
                 end
             end
-            
-            -- 2. Apply SPHERE Hitbox to the closest player
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= player and p.Character then
-                    local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-                    
-                    if hrp then
-                        -- Clean up old sphere mesh
-                        local oldMesh = hrp:FindFirstChild("KillAuraSphere")
-                        if oldMesh then oldMesh:Destroy() end
-                        
-                        if p == closestTarget then
-                            -- Apply size 28 and make it a Sphere
-                            hrp.Size = Vector3.new(CONFIG.KillAuraHitboxSize, CONFIG.KillAuraHitboxSize, CONFIG.KillAuraHitboxSize)
-                            hrp.Transparency = CONFIG.KillAuraVisibility
-                            hrp.BrickColor = BrickColor.new("Really red")
-                            hrp.Material = Enum.Material.ForceField
-                            hrp.CanCollide = false
-                            
-                            local sphere = Instance.new("SpecialMesh")
-                            sphere.MeshType = Enum.MeshType.Sphere
-                            sphere.Name = "KillAuraSphere"
-                            sphere.Parent = hrp
-                        else
-                            hrp.Size = Vector3.new(2, 2, 1)
-                            hrp.Transparency = 1
-                        end
-                    end
-                end
-            end
-            
-            -- 3. Click if we found a target within 15 studs
-            if closestTarget then
-                doClick()
-                task.wait(kaClickInterval)
-            else
-                task.wait(0.1)
-            end
-        else
             task.wait(0.1)
-        end
+        else task.wait(0.5) end
     end
 end)
 
--- ============================================
--- MOVEMENT LOGIC
--- ============================================
+-- Auto Grab
+task.spawn(function()
+    while task.wait() do
+        if CONFIG.AutoGrabEnabled and GrabRF then pcall(function() GrabRF:InvokeServer() end) else task.wait(0.01) end
+    end
+end)
+
+-- Inf Jump
 UserInputService.JumpRequest:Connect(function()
     if not CONFIG.InfJumpEnabled or not player.Character then return end
-    
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
+    local h=player.Character:FindFirstChildOfClass("Humanoid") if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
 end)
 
+-- TP Walk
 RunService.Heartbeat:Connect(function(dt)
     if not CONFIG.TpWalkEnabled or not player.Character then return end
-    
-    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    
-    if hrp and hum then
+    local hrp=player.Character:FindFirstChild("HumanoidRootPart") local h=player.Character:FindFirstChildOfClass("Humanoid")
+    if hrp and h then
         if not CONFIG.TpWalkAnim then preloadTpWalkAnim() end
-        
-        local moveDirection = hum.MoveDirection
-        
-        if moveDirection.Magnitude > 0 then
-            local distance = CONFIG.TpWalkSpeed * dt
-            hrp.CFrame = hrp.CFrame + (moveDirection * distance)
-            
-            hrp.AssemblyLinearVelocity = Vector3.Zero
-            hrp.AssemblyAngularVelocity = Vector3.Zero
-            
-            if CONFIG.TpWalkAnim and not CONFIG.TpWalkAnim.IsPlaying then
-                CONFIG.TpWalkAnim:Play()
+        local md=h.MoveDirection
+        if md.Magnitude>0 then
+            hrp.CFrame=hrp.CFrame+(md*CONFIG.TpWalkSpeed*dt)
+            hrp.AssemblyLinearVelocity=Vector3.Zero hrp.AssemblyAngularVelocity=Vector3.Zero
+            if CONFIG.TpWalkAnim and not CONFIG.TpWalkAnim.IsPlaying then CONFIG.TpWalkAnim:Play() end
+            if h:GetState()~=Enum.HumanoidStateType.Running then h:ChangeState(Enum.HumanoidStateType.Running) end
+        else if CONFIG.TpWalkAnim and CONFIG.TpWalkAnim.IsPlaying then CONFIG.TpWalkAnim:Stop() end end
+    end
+end)
+
+-- Spam Notify
+task.spawn(function()
+    while task.wait() do
+        if CONFIG.SpamNotifyEnabled and RequestPrompt then
+            local msg=CONFIG.SpamNotifyMessage~="" and CONFIG.SpamNotifyMessage or "default"
+            for _,p in ipairs(Players:GetPlayers()) do
+                if p~=player then pcall(function() RequestPrompt:FireServer(70932517024004,msg,p,0,3,0,0,0,0) end) end
             end
-            
-            if hum:GetState() ~= Enum.HumanoidStateType.Running then
-                hum:ChangeState(Enum.HumanoidStateType.Running)
-            end
-        else
-            if CONFIG.TpWalkAnim and CONFIG.TpWalkAnim.IsPlaying then
-                CONFIG.TpWalkAnim:Stop()
-            end
-        end
+            if StopCarry then pcall(function() StopCarry:FireServer() end) end
+        else task.wait(0.1) end
     end
 end)
 
 -- ============================================
--- BOT / COMMAND LOGIC
+-- BOT CONFIG
 -- ============================================
-local BOT_CONFIG = {
-    SelectedUser = nil,
-    GiveCommandsEnabled = false,
-    IsKilling = false,
-    KillTarget = nil
-}
+local BOT_CONFIG={SelectedUser=nil,GiveCommandsEnabled=false,IsKilling=false,KillTarget=nil}
 
-local function onPlayerChatted(speakerName, message)
+local function onPlayerChatted(sn,msg)
     if not BOT_CONFIG.GiveCommandsEnabled or not BOT_CONFIG.SelectedUser then return end
-    
-    if speakerName:lower() == BOT_CONFIG.SelectedUser.Name:lower() or speakerName:lower() == BOT_CONFIG.SelectedUser.DisplayName:lower() then
-        if message:lower():sub(1, 5) == ".kill" then
-            local targetName = message:sub(7):lower()
-            local targetPlayer = nil
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Name:lower():find(targetName) or p.DisplayName:lower():find(targetName) then
-                    targetPlayer = p
-                    break
-                end
-            end
-            
-            if targetPlayer and targetPlayer ~= player then
-                BOT_CONFIG.KillTarget = targetPlayer
-                BOT_CONFIG.IsKilling = true
-            end
-        elseif message:lower() == ".stop" then
-            BOT_CONFIG.IsKilling = false
-            BOT_CONFIG.KillTarget = nil
-        end
+    if sn:lower()==BOT_CONFIG.SelectedUser.Name:lower() or sn:lower()==BOT_CONFIG.SelectedUser.DisplayName:lower() then
+        if msg:lower():sub(1,5)==".kill" then
+            local tn=msg:sub(7):lower() local tp=nil
+            for _,p in ipairs(Players:GetPlayers()) do if p.Name:lower():find(tn) or p.DisplayName:lower():find(tn) then tp=p break end end
+            if tp and tp~=player then BOT_CONFIG.KillTarget=tp BOT_CONFIG.IsKilling=true end
+        elseif msg:lower()==".stop" then BOT_CONFIG.IsKilling=false BOT_CONFIG.KillTarget=nil end
     end
 end
-
-Players.PlayerAdded:Connect(function(plr)
-    plr.Chatted:Connect(function(msg) onPlayerChatted(plr.Name, msg) end)
-end)
-for _, plr in ipairs(Players:GetPlayers()) do
-    plr.Chatted:Connect(function(msg) onPlayerChatted(plr.Name, msg) end)
-end
+Players.PlayerAdded:Connect(function(p) p.Chatted:Connect(function(m) onPlayerChatted(p.Name,m) end) end)
+for _,p in ipairs(Players:GetPlayers()) do p.Chatted:Connect(function(m) onPlayerChatted(p.Name,m) end) end
 
 RunService.Heartbeat:Connect(function()
     if not BOT_CONFIG.IsKilling or not BOT_CONFIG.KillTarget then return end
-    local myChar = player.Character
-    local targetChar = BOT_CONFIG.KillTarget.Character
-    
-    if myChar and targetChar then
-        local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-        local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-        local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
-        
-        if myHRP and targetHRP and targetHum and targetHum.Health > 0 then
-            myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 3)
-            if PunchDo then pcall(function() PunchDo:InvokeServer(targetHum) end) end
-        else
-            BOT_CONFIG.IsKilling = false
-            BOT_CONFIG.KillTarget = nil
-        end
+    local mc=player.Character local tc=BOT_CONFIG.KillTarget.Character
+    if mc and tc then
+        local mh=mc:FindFirstChild("HumanoidRootPart") local th=tc:FindFirstChild("HumanoidRootPart") local tH=tc:FindFirstChildOfClass("Humanoid")
+        if mh and th and tH and tH.Health>0 then mh.CFrame=th.CFrame*CFrame.new(0,0,3) if PunchDo then pcall(function() PunchDo:InvokeServer(tH) end) end
+        else BOT_CONFIG.IsKilling=false BOT_CONFIG.KillTarget=nil end
     end
 end)
 
--- ============================================
--- VISUAL & AUTO CARRY LOGIC
--- ============================================
+-- Emote Lock + Auto Carry
 RunService.Heartbeat:Connect(function()
     if not player.Character then return end
-    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-    local animator = hum and hum:FindFirstChildOfClass("Animator")
-    
-    if CONFIG.EmoteLock and CONFIG.SavedEmoteID ~= "" and animator then
+    local h=player.Character:FindFirstChildOfClass("Humanoid") local an=h and h:FindFirstChildOfClass("Animator")
+    if CONFIG.EmoteLock and CONFIG.SavedEmoteID~="" and an then
         if not CONFIG.CurrentEmoteTrack or not CONFIG.CurrentEmoteTrack.IsPlaying then
             if CONFIG.CurrentEmoteTrack then CONFIG.CurrentEmoteTrack:Stop() end
-            local anim = Instance.new("Animation")
-            anim.AnimationId = CONFIG.SavedEmoteID
-            CONFIG.CurrentEmoteTrack = animator:LoadAnimation(anim)
-            CONFIG.CurrentEmoteTrack.Priority = Enum.AnimationPriority.Action4
-            CONFIG.CurrentEmoteTrack.Looped = true
-            CONFIG.CurrentEmoteTrack:Play()
+            local a=Instance.new("Animation") a.AnimationId=CONFIG.SavedEmoteID
+            CONFIG.CurrentEmoteTrack=an:LoadAnimation(a)
+            CONFIG.CurrentEmoteTrack.Priority=Enum.AnimationPriority.Action4
+            CONFIG.CurrentEmoteTrack.Looped=true CONFIG.CurrentEmoteTrack:Play()
         end
-    elseif not CONFIG.EmoteLock and CONFIG.CurrentEmoteTrack then
-        CONFIG.CurrentEmoteTrack:Stop()
-        CONFIG.CurrentEmoteTrack = nil
-    end
-
+    elseif not CONFIG.EmoteLock and CONFIG.CurrentEmoteTrack then CONFIG.CurrentEmoteTrack:Stop() CONFIG.CurrentEmoteTrack=nil end
     if CONFIG.AutoAcceptCarry and CarryRequest then
-        local acceptList = parseList(CONFIG.AutoAcceptWhitelist)
-        local blacklist = parseList(CONFIG.AutoAcceptBlacklist)
-        
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= player then
-                if not isSafe(p.Name, blacklist) and not isSafe(p.DisplayName, blacklist) then
-                    local shouldSend = (#acceptList == 0) or isTarget(p.Name, acceptList) or isTarget(p.DisplayName, acceptList)
-                    if shouldSend then
-                        for i = 0, 1 do
-                            pcall(function() CarryRequest:FireServer(p, 1, 0, 1, 0, 180, 0) end)
-                        end
-                    end
-                end
+        local al=parseList(CONFIG.AutoAcceptWhitelist) local bl=parseList(CONFIG.AutoAcceptBlacklist)
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=player and not isSafe(p.Name,bl) and not isSafe(p.DisplayName,bl) then
+                local send=(#al==0) or isTarget(p.Name,al) or isTarget(p.DisplayName,al)
+                if send then for i=0,1 do pcall(function() CarryRequest:FireServer(p,1,0,1,0,180,0) end) end end
             end
         end
     end
 end)
 
 if DeclineRequest then
-    if SendRequestGui then
-        SendRequestGui.OnClientEvent:Connect(function(requester)
-            if CONFIG.AutoDeclineEnabled and requester then
-                for i = 1, 5 do
-                    pcall(function() DeclineRequest:FireServer(); StopCarry:FireServer() end)
-                end
-            end
-        end)
+    if SendRequestGui then SendRequestGui.OnClientEvent:Connect(function(r) if CONFIG.AutoDeclineEnabled and r then for i=1,5 do pcall(function() DeclineRequest:FireServer() StopCarry:FireServer() end) end end end) end
+    RunService.Heartbeat:Connect(function() if CONFIG.AutoDeclineEnabled then for i=1,5 do pcall(function() DeclineRequest:FireServer() StopCarry:FireServer() if TogglePrompts then TogglePrompts:FireServer(false) end end) end end end)
+end
+
+-- Announce / Detention
+local function sendAnnouncement(t) if not AnnouncementRequest or t=="" then return end pcall(function() AnnouncementRequest:FireServer(t) end) end
+local function sendDetention(t) if not DetentionRequest then return end pcall(function() DetentionRequest:FireServer(t,"Breaking Rules") end) end
+task.spawn(function() while task.wait(0.1) do if CONFIG.DetentionLooping then for _,p in ipairs(Players:GetPlayers()) do if p~=player then sendDetention(p) end end end end end)
+
+-- ============================================
+-- BLANK GUI SHELL
+-- ============================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MiniHub"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 380, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -190, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+local glowBorder = Instance.new("Frame")
+glowBorder.Size = UDim2.new(1, 6, 1, 6)
+glowBorder.Position = UDim2.new(0, -3, 0, -3)
+glowBorder.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+glowBorder.BackgroundTransparency = 0.6
+glowBorder.BorderSizePixel = 0
+glowBorder.ZIndex = 0
+glowBorder.Parent = mainFrame
+Instance.new("UICorner", glowBorder).CornerRadius = UDim.new(0, 14)
+
+coroutine.wrap(function()
+    local colors = {Color3.fromRGB(200, 200, 255), Color3.fromRGB(255, 200, 255), Color3.fromRGB(200, 255, 255)}
+    local idx = 1
+    while glowBorder and glowBorder.Parent do
+        glowBorder.BackgroundColor3 = colors[idx]
+        idx = idx % #colors + 1
+        task.wait(0.15)
     end
+end)()
 
-    RunService.Heartbeat:Connect(function()
-        if CONFIG.AutoDeclineEnabled then
-            for i = 1, 5 do
-                pcall(function()
-                    DeclineRequest:FireServer()
-                    StopCarry:FireServer()
-                    if TogglePrompts then TogglePrompts:FireServer(false) end
-                end)
-            end
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 32)
+titleBar.BackgroundColor3 = Color3.fromRGB(240, 240, 255)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12, 0, 0)
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -70, 1, 0)
+titleText.Position = UDim2.new(0, 8, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "⚡ PAZ HUB"
+titleText.TextColor3 = Color3.fromRGB(0, 0, 0)
+titleText.TextSize = 12
+titleText.Font = Enum.Font.GothamBold
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+minimizeBtn.Position = UDim2.new(1, -54, 0.5, -12)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 220)
+minimizeBtn.Text = "−"
+minimizeBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+minimizeBtn.TextSize = 12
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Parent = titleBar
+Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -28, 0.5, -12)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 11
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.BorderSizePixel = 0
+closeBtn.Parent = titleBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+local isMinimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        mainFrame.Size = UDim2.new(0, 160, 0, 32)
+        minimizeBtn.Text = "+"
+        for _, child in pairs(mainFrame:GetChildren()) do
+            if child ~= titleBar and child ~= glowBorder then child.Visible = false end
         end
-    end)
-end
-
--- ============================================
--- VISUAL LOGIC (PRINCIPAL)
--- ============================================
-local function sendAnnouncement(text)
-    if not AnnouncementRequest or text == "" then return end
-    pcall(function() AnnouncementRequest:FireServer(text) end)
-end
-
-local function sendDetention(targetPlayer)
-    if not DetentionRequest then return end
-    pcall(function() DetentionRequest:FireServer(targetPlayer, "Breaking Rules") end)
-end
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if CONFIG.DetentionLooping then
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= player then sendDetention(plr) end
-            end
+    else
+        mainFrame.Size = UDim2.new(0, 380, 0, 420)
+        minimizeBtn.Text = "−"
+        for _, child in pairs(mainFrame:GetChildren()) do
+            if child ~= titleBar and child ~= glowBorder then child.Visible = true end
         end
     end
 end)
 
--- ============================================
--- SUPER COOL UI (TABS)
--- ============================================
-local oldGui = CoreGui:FindFirstChild("UltimateHub")
-if oldGui then oldGui:Destroy() end
+closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
-local BG = Color3.fromRGB(15, 15, 20)
-local SIDEBAR = Color3.fromRGB(25, 25, 35)
-local TEXT = Color3.fromRGB(220, 225, 255)
-local ACCENT = Color3.fromRGB(138, 43, 226)
-local ACCENT_ON = Color3.fromRGB(46, 204, 113)
-local ACCENT_RED = Color3.fromRGB(231, 76, 60)
+local tabs = {"Defense", "Combat", "Hitbox", "Visuals", "Movement", "FREEZE", "Bot"}
+local tabButtons = {}
+local tabPanels = {}
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "UltimateHub"
-screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 999999
-screenGui.Parent = CoreGui
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(0, 75, 1, -38)
+tabBar.Position = UDim2.new(0, 0, 0, 36)
+tabBar.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+tabBar.BorderSizePixel = 0
+tabBar.Parent = mainFrame
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 450, 0, 400)
-mainFrame.Position = UDim2.new(0.5, -225, 0.5, -200)
-mainFrame.BackgroundColor3 = BG
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
-
-local stroke = Instance.new("UIStroke", mainFrame)
-stroke.Color = ACCENT
-stroke.Thickness = 2
-
-local header = Instance.new("Frame", mainFrame)
-header.Size = UDim2.new(1, 0, 0, 35)
-header.BackgroundColor3 = SIDEBAR
-header.BorderSizePixel = 0
-Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
-
-local title = Instance.new("TextLabel", header)
-title.Size = UDim2.new(1, -50, 1, 0)
-title.Position = UDim2.new(0, 15, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "✨ PAZ HUB"
-title.TextColor3 = ACCENT
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 16
-title.TextXAlignment = Enum.TextXAlignment.Left
-
-local close = Instance.new("TextButton", header)
-close.Size = UDim2.new(0, 24, 0, 24)
-close.Position = UDim2.new(1, -32, 0.5, -12)
-close.BackgroundColor3 = ACCENT_RED
-close.Text = "X"
-close.TextColor3 = Color3.fromRGB(255, 255, 255)
-close.Font = Enum.Font.GothamBold
-Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
-close.MouseButton1Click:Connect(function() screenGui:Destroy() end)
-
-local sidebar = Instance.new("Frame", mainFrame)
-sidebar.Size = UDim2.new(0, 120, 1, -35)
-sidebar.Position = UDim2.new(0, 0, 0, 35)
-sidebar.BackgroundColor3 = SIDEBAR
-sidebar.BorderSizePixel = 0
-
-local content = Instance.new("Frame", mainFrame)
-content.Size = UDim2.new(1, -120, 1, -35)
-content.Position = UDim2.new(0, 120, 0, 35)
-content.BackgroundColor3 = BG
-content.BorderSizePixel = 0
-
-local pages = {}
-local buttons = {}
-
-local function createTab(name, index)
+for i, name in ipairs(tabs) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 30)
-    btn.Position = UDim2.new(0, 5, 0, 10 + (index * 35))
-    btn.BackgroundColor3 = index == 1 and ACCENT or BG
+    btn.Size = UDim2.new(1, -4, 0, 26)
+    btn.Position = UDim2.new(0, 2, 0, (i - 1) * 28 + 4)
+    btn.BackgroundColor3 = (i == 1) and Color3.fromRGB(180, 180, 220) or Color3.fromRGB(240, 240, 250)
+    btn.BackgroundTransparency = (i == 1) and 0.2 or 0.5
     btn.Text = name
-    btn.TextColor3 = TEXT
+    btn.TextColor3 = (i == 1) and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(100, 100, 120)
+    btn.TextSize = 8
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
-    btn.Parent = sidebar
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.BorderSizePixel = 0
+    btn.Parent = tabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    tabButtons[i] = btn
     
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, -20, 1, -20)
-    page.Position = UDim2.new(0, 10, 0, 10)
-    page.BackgroundTransparency = 1
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.Visible = index == 1
-    page.Parent = content
-    Instance.new("UIListLayout", page).Padding = UDim.new(0, 10)
-    
-    buttons[index] = btn
-    pages[index] = page
+    local panel = Instance.new("ScrollingFrame")
+    panel.Size = UDim2.new(1, -80, 1, -38)
+    panel.Position = UDim2.new(0, 78, 0, 36)
+    panel.BackgroundTransparency = 1
+    panel.BorderSizePixel = 0
+    panel.ScrollBarThickness = 2
+    panel.ScrollBarImageColor3 = Color3.fromRGB(180, 180, 220)
+    panel.CanvasSize = UDim2.new(0, 0, 0, 0)
+    panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    panel.Visible = (i == 1)
+    panel.Parent = mainFrame
+    Instance.new("UIListLayout", panel).Padding = UDim.new(0, 4)
+    local pad = Instance.new("UIPadding", panel)
+    pad.PaddingLeft = UDim.new(0, 4)
+    pad.PaddingRight = UDim.new(0, 4)
+    pad.PaddingTop = UDim.new(0, 4)
+    tabPanels[i] = panel
     
     btn.MouseButton1Click:Connect(function()
-        for i, b in pairs(buttons) do
-            b.BackgroundColor3 = i == index and ACCENT or BG
-            pages[i].Visible = i == index
+        for j, b in ipairs(tabButtons) do
+            b.BackgroundColor3 = (j == i) and Color3.fromRGB(180, 180, 220) or Color3.fromRGB(240, 240, 250)
+            b.BackgroundTransparency = (j == i) and 0.2 or 0.5
+            b.TextColor3 = (j == i) and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(100, 100, 120)
+            tabPanels[j].Visible = (j == i)
         end
+        panel.CanvasPosition = Vector2.new(0, 0)
     end)
 end
 
-local function createToggle(parent, text, default, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = default and ACCENT_ON or Color3.fromRGB(35, 35, 45)
-    btn.Text = text .. ": " .. (default and "ON" or "OFF")
-    btn.TextColor3 = TEXT
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
+-- ============================================
+-- UI BUILDERS
+-- ============================================
+local function createSection(parent, title)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1, 0, 0, 18)
+    f.BackgroundColor3 = Color3.fromRGB(220, 220, 240)
+    f.BackgroundTransparency = 0.3
+    f.BorderSizePixel = 0
+    f.Parent = parent
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 4)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -8, 1, 0)
+    l.Position = UDim2.new(0, 5, 0, 0)
+    l.BackgroundTransparency = 1
+    l.Text = title:upper()
+    l.TextColor3 = Color3.fromRGB(80, 80, 150)
+    l.TextSize = 8
+    l.Font = Enum.Font.GothamBold
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = f
+end
+
+local function createToggle(parent, label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 24)
+    frame.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
     local state = default
+    local lb = Instance.new("TextLabel")
+    lb.Size = UDim2.new(0.6, 0, 1, 0)
+    lb.Position = UDim2.new(0, 6, 0, 0)
+    lb.BackgroundTransparency = 1
+    lb.Text = label
+    lb.TextColor3 = Color3.fromRGB(0, 0, 0)
+    lb.TextSize = 9
+    lb.Font = Enum.Font.Gotham
+    lb.TextXAlignment = Enum.TextXAlignment.Left
+    lb.Parent = frame
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 40, 0, 18)
+    btn.Position = UDim2.new(1, -44, 0.5, -9)
+    btn.BackgroundColor3 = state and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(200, 200, 200)
+    btn.Text = state and "ON" or "OFF"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 8
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = frame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     btn.MouseButton1Click:Connect(function()
         state = not state
-        btn.BackgroundColor3 = state and ACCENT_ON or Color3.fromRGB(35, 35, 45)
-        btn.Text = text .. ": " .. (state and "ON" or "OFF")
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(200, 200, 200)
+        btn.Text = state and "ON" or "OFF"
         if callback then callback(state) end
     end)
     return btn
 end
 
-local function createInput(parent, placeholder, default, callback)
+local function createInput(parent, label, placeholder, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 26)
+    frame.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
+    local lb = Instance.new("TextLabel")
+    lb.Size = UDim2.new(0.4, 0, 1, 0)
+    lb.Position = UDim2.new(0, 6, 0, 0)
+    lb.BackgroundTransparency = 1
+    lb.Text = label
+    lb.TextColor3 = Color3.fromRGB(80, 80, 100)
+    lb.TextSize = 8
+    lb.Font = Enum.Font.Gotham
+    lb.TextXAlignment = Enum.TextXAlignment.Left
+    lb.Parent = frame
     local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1, 0, 0, 35)
-    box.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    box.PlaceholderText = placeholder
+    box.Size = UDim2.new(0.55, 0, 0.75, 0)
+    box.Position = UDim2.new(0.43, 0, 0.125, 0)
+    box.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     box.Text = default or ""
-    box.TextColor3 = ACCENT
-    box.Font = Enum.Font.Code
-    box.TextSize = 13
-    box.Parent = parent
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+    box.PlaceholderText = placeholder or ""
+    box.TextColor3 = Color3.fromRGB(0, 0, 0)
+    box.TextSize = 9
+    box.Font = Enum.Font.Gotham
+    box.ClearTextOnFocus = false
+    box.Parent = frame
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
     box.FocusLost:Connect(function() if callback then callback(box.Text) end end)
+    return box
 end
 
-local function createButton(parent, text, callback, color)
+local function createButton(parent, label, callback, color)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = color or ACCENT
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Size = UDim2.new(1, 0, 0, 26)
+    btn.BackgroundColor3 = color or Color3.fromRGB(180, 180, 220)
+    btn.BackgroundTransparency = 0.2
+    btn.Text = label
+    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    btn.TextSize = 9
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
+    btn.BorderSizePixel = 0
     btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     btn.MouseButton1Click:Connect(callback)
     return btn
 end
 
 local function createLabel(parent, text, color)
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, 0, 0, 20)
+    lbl.Size = UDim2.new(1, 0, 0, 18)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = color or Color3.fromRGB(150, 150, 170)
     lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 11
+    lbl.TextSize = 8
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = parent
 end
 
--- Build Tabs
-createTab("Defense", 1)
-createTab("Combat", 2)
-createTab("Visuals", 3)
-createTab("Movement", 4)
-createTab("Carry", 5)
-createTab("Bot", 6)
-
--- Defense Page
-createToggle(pages[1], "Anti-Hit(TP Player That Hit You)", CONFIG.AntiHitEnabled, function(s) CONFIG.AntiHitEnabled = s end)
-createToggle(pages[1], "Anti-Hit ", CONFIG.AntiHit15Enabled, function(s) CONFIG.AntiHit15Enabled = s end)
-createToggle(pages[1], "Anti-Grab", CONFIG.AntiGrabEnabled, function(s) CONFIG.AntiGrabEnabled = s end)
-
-local skyDropBtn = createToggle(pages[1], "Anti-ragdoll", CONFIG.SkyDropEnabled, function(s) 
-    CONFIG.SkyDropEnabled = s 
-    CONFIG.HitCount = 0 
+-- ============================================
+-- DEFENSE TAB
+-- ============================================
+createSection(tabPanels[1], "Defense")
+createToggle(tabPanels[1], "Anti-Hit (TP Player That Hit You)", CONFIG.AntiHitEnabled, function(s) CONFIG.AntiHitEnabled = s end)
+createToggle(tabPanels[1], "Anti-Hit ", CONFIG.AntiHit15Enabled, function(s) CONFIG.AntiHit15Enabled = s end)
+createToggle(tabPanels[1], "Anti-Grab", CONFIG.AntiGrabEnabled, function(s) CONFIG.AntiGrabEnabled = s end)
+createToggle(tabPanels[1], "Auto Block", CONFIG.AutoBlockEnabled, function(s) setAutoBlock(s) end)
+createToggle(tabPanels[1], "Anti-Ragdoll ", CONFIG.AntiRagEnabled, function(s)
+    CONFIG.AntiRagEnabled = s
+    if s then startARC() else stopARC() end
+end)
+createInput(tabPanels[1], "Whitelist", "space separated", CONFIG.SafeList, function(txt) CONFIG.SafeList = txt end)
+createInput(tabPanels[1], "Grab TP Delay", "default 0.2", tostring(CONFIG.antiGrabDelay), function(txt)
+    local v = tonumber(txt); if v then CONFIG.antiGrabDelay = v end
 end)
 
-local hitLabel = Instance.new("TextLabel")
-hitLabel.Size = UDim2.new(1, 0, 0, 20)
-hitLabel.BackgroundTransparency = 1
-hitLabel.Text = "Hits: 0 / 8"
-hitLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
-hitLabel.Font = Enum.Font.Gotham
-hitLabel.TextSize = 12
-hitLabel.TextXAlignment = Enum.TextXAlignment.Left
-hitLabel.Parent = pages[1]
-
-RunService.Heartbeat:Connect(function()
-    if CONFIG.SkyDropEnabled then
-        hitLabel.Text = "Hits: " .. CONFIG.HitCount .. " / " .. CONFIG.MaxHits
-    else
-        hitLabel.Text = "Hits: 0 / 8"
-    end
+-- ============================================
+-- COMBAT TAB
+-- ============================================
+createSection(tabPanels[2], "Kill Aura")
+createToggle(tabPanels[2], "Kill Aura", CONFIG.KillAuraEnabled, function(s) 
+    CONFIG.KillAuraEnabled = s 
+    if not s then ResetAllHitboxes() end
+end)
+createInput(tabPanels[2], "Targets", "blank = all", CONFIG.KillAuraTargetList, function(txt) CONFIG.KillAuraTargetList = txt end)
+createInput(tabPanels[2], "Safe List", "space separated", CONFIG.KillAuraSafeList, function(txt) CONFIG.KillAuraSafeList = txt end)
+createInput(tabPanels[2], "Visibility", "0-1", tostring(CONFIG.KillAuraVisibility), function(txt)
+    local v = tonumber(txt); if v and v >= 0 and v <= 1 then CONFIG.KillAuraVisibility = v end
 end)
 
-createInput(pages[1], "Whitelist (space separated)", CONFIG.SafeList, function(txt) CONFIG.SafeList = txt end)
-
--- Combat Page (HITBOX + KILL AURA)
-createButton(pages[2], "OPEN HITBOX GUI", function()
-    if hitboxGui and hitboxGui.Parent then
-        hitboxGui:Destroy()
-    end
-    
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local RunService = game:GetService("RunService")
-
-    _G.HitboxEnabled = true
-    _G.HitboxSize = 20
-    _G.HitboxTransparency = 0.6
-
-    local ScreenGui = Instance.new("ScreenGui")
-    local MainFrame = Instance.new("Frame")
-    local Title = Instance.new("TextLabel")
-    local ToggleButton = Instance.new("TextButton")
-    local SizeInput = Instance.new("TextBox")
-    local SizeLabel = Instance.new("TextLabel")
-    local UICorner = Instance.new("UICorner")
-
-    ScreenGui.Name = "HitboxExpanderGUI"
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    ScreenGui.ResetOnSpawn = false
-    hitboxGui = ScreenGui
-
-    MainFrame.Name = "MainFrame"
-    MainFrame.Parent = ScreenGui
-    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
-    MainFrame.Size = UDim2.new(0, 210, 0, 140)
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-
-    local FrameCorner = UICorner:Clone()
-    FrameCorner.CornerRadius = UDim.new(0, 8)
-    FrameCorner.Parent = MainFrame
-
-    Title.Parent = MainFrame
-    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-    Title.Size = UDim2.new(1, 0, 0, 30)
-    Title.Font = Enum.Font.SourceSansBold
-    Title.Text = "Hitbox Expander (1-150)"
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 15
-
-    ToggleButton.Parent = MainFrame
-    ToggleButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-    ToggleButton.Position = UDim2.new(0.08, 0, 0.3, 0)
-    ToggleButton.Size = UDim2.new(0.84, 0, 0, 32)
-    ToggleButton.Font = Enum.Font.SourceSansBold
-    ToggleButton.Text = "Hitbox: ON"
-    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleButton.TextSize = 14
-
-    local ButtonCorner = UICorner:Clone()
-    ButtonCorner.CornerRadius = UDim.new(0, 6)
-    ButtonCorner.Parent = ToggleButton
-
-    SizeLabel.Parent = MainFrame
-    SizeLabel.Position = UDim2.new(0.08, 0, 0.62, 0)
-    SizeLabel.Size = UDim2.new(0.45, 0, 0, 30)
-    SizeLabel.Font = Enum.Font.SourceSans
-    SizeLabel.Text = "Size (1-150):"
-    SizeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    SizeLabel.TextSize = 14
-
-    SizeInput.Parent = MainFrame
-    SizeInput.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-    SizeInput.Position = UDim2.new(0.55, 0, 0.62, 0)
-    SizeInput.Size = UDim2.new(0.37, 0, 0, 30)
-    SizeInput.Font = Enum.Font.SourceSansBold
-    SizeInput.Text = tostring(_G.HitboxSize)
-    SizeInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SizeInput.TextSize = 14
-
-    local InputCorner = UICorner:Clone()
-    InputCorner.CornerRadius = UDim.new(0, 6)
-    InputCorner.Parent = SizeInput
-
-    ToggleButton.MouseButton1Click:Connect(function()
-        _G.HitboxEnabled = not _G.HitboxEnabled
-        if _G.HitboxEnabled then
-            ToggleButton.Text = "Hitbox: ON"
-            ToggleButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
-        else
-            ToggleButton.Text = "Hitbox: OFF"
-            ToggleButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
-        end
-    end)
-
-    SizeInput.FocusLost:Connect(function()
-        local val = tonumber(SizeInput.Text)
-        if val then
-            val = math.clamp(math.floor(val), 1, 150)
-            _G.HitboxSize = val
-            SizeInput.Text = tostring(val)
-        else
-            SizeInput.Text = tostring(_G.HitboxSize)
-        end
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    if _G.HitboxEnabled then
-                        hrp.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
-                        hrp.Transparency = _G.HitboxTransparency
-                        hrp.BrickColor = BrickColor.new("Really red")
-                        hrp.Material = Enum.Material.ForceField
-                        hrp.CanCollide = false
-                    else
-                        hrp.Size = Vector3.new(2, 2, 1)
-                        hrp.Transparency = 1
-                    end
-                end
-            end
-        end
-    end)
-end, Color3.fromRGB(255, 165, 0))
-
-createToggle(pages[2], "God Mode (Combat Breaker)", CONFIG.CombatBreakerEnabled, function(s) CONFIG.CombatBreakerEnabled = s end)
-createToggle(pages[2], "God Mode Movement", CONFIG.FastEmoteEnabled, function(s) CONFIG.FastEmoteEnabled = s end)
-createToggle(pages[2], "No Slow", CONFIG.NoSlowEnabled, function(s) CONFIG.NoSlowEnabled = s end)
-
-createToggle(pages[2], "Kill Aura", CONFIG.KillAuraEnabled, function(s) CONFIG.KillAuraEnabled = s end)
-createInput(pages[2], "Kill Aura Target List (blank = all)", CONFIG.KillAuraTargetList, function(txt) CONFIG.KillAuraTargetList = txt end)
-createInput(pages[2], "Kill Aura Whitelist", CONFIG.KillAuraSafeList, function(txt) CONFIG.KillAuraSafeList = txt end)
-createInput(pages[2], "Kill Aura Visibility (0-1)", tostring(CONFIG.KillAuraVisibility), function(txt) 
-    local val = tonumber(txt)
-    if val and val >= 0 and val <= 1 then
-        CONFIG.KillAuraVisibility = val
-    end
+createSection(tabPanels[2], "Combat")
+createToggle(tabPanels[2], "Semi-God Mode", CONFIG.CombatBreakerEnabled, function(s) CONFIG.CombatBreakerEnabled = s end)
+createToggle(tabPanels[2], "Semi-God Mode Movement", CONFIG.FastEmoteEnabled, function(s) CONFIG.FastEmoteEnabled = s end)
+createToggle(tabPanels[2], "No Slow", CONFIG.NoSlowEnabled, function(s) CONFIG.NoSlowEnabled = s end)
+createToggle(tabPanels[2], "Auto Grab", CONFIG.AutoGrabEnabled, function(s) CONFIG.AutoGrabEnabled = s end)
+createToggle(tabPanels[2], "Death TP", CONFIG.DeathTpEnabled, function(s)
+    CONFIG.DeathTpEnabled = s
+    if not s then CONFIG.LastDeathPos = nil end
 end)
 
--- Visuals Page
-createToggle(pages[3], "Emote Lock", CONFIG.EmoteLock, function(s) CONFIG.EmoteLock = s end)
-createInput(pages[3], "Custom Pet Name", CONFIG.PetCustomText, function(txt) CONFIG.PetCustomText = txt end)
-createToggle(pages[3], "PET ANIMATOR", CONFIG.PetSpamEnabled, function(s) 
-    CONFIG.PetSpamEnabled = s 
+-- ============================================
+-- HITBOX TAB (NEW)
+-- ============================================
+createSection(tabPanels[3], "Hitbox Expander")
+createToggle(tabPanels[3], "Hitbox Expander", CONFIG.HitboxEnabled, function(s) 
+    CONFIG.HitboxEnabled = s 
+    if not s then ResetAllHitboxes() end
+end)
+createInput(tabPanels[3], "Target List", "blank = all", CONFIG.HitboxTargetList, function(txt) CONFIG.HitboxTargetList = txt end)
+createInput(tabPanels[3], "Hitbox Size", "1-150", tostring(CONFIG.HitboxSize), function(txt)
+    local v = tonumber(txt); if v and v >= 1 and v <= 150 then CONFIG.HitboxSize = math.floor(v) end
+end)
+createInput(tabPanels[3], "Hitbox Visibility", "0-1", tostring(CONFIG.HitboxVisibility), function(txt)
+    local v = tonumber(txt); if v and v >= 0 and v <= 1 then CONFIG.HitboxVisibility = v end
+end)
+
+-- ============================================
+-- VISUALS TAB
+-- ============================================
+createSection(tabPanels[4], "Emote")
+createToggle(tabPanels[4], "Emote Lock", CONFIG.EmoteLock, function(s) CONFIG.EmoteLock = s end)
+
+createSection(tabPanels[4], "Pet")
+createInput(tabPanels[4], "Pet Text", "", CONFIG.PetCustomText, function(txt) CONFIG.PetCustomText = txt end)
+createToggle(tabPanels[4], "Pet Animator", CONFIG.PetSpamEnabled, function(s)
+    CONFIG.PetSpamEnabled = s
     if s then CONFIG.TargetPet = findMyPet() end
 end)
 
-createInput(pages[3], "Announcement Text", CONFIG.AnnounceText, function(txt) CONFIG.AnnounceText = txt end)
-createButton(pages[3], "SEND ANNOUNCEMENT", function()
-    sendAnnouncement(CONFIG.AnnounceText)
-end, Color3.fromRGB(50, 150, 255))
+createSection(tabPanels[4], "Announcement")
+createInput(tabPanels[4], "Announce Text", "", CONFIG.AnnounceText, function(txt) CONFIG.AnnounceText = txt end)
+createButton(tabPanels[4], "SEND ANNOUNCEMENT", function() sendAnnouncement(CONFIG.AnnounceText) end, Color3.fromRGB(50, 150, 255))
 
-local detBtn = createToggle(pages[3], "SPAM DETENTION (ALL)", CONFIG.DetentionLooping, function(s)
-    CONFIG.DetentionLooping = s
-    if s then
-        detBtn.Text = "SPAM DETENTION: ON"
-        detBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    else
-        detBtn.Text = "SPAM DETENTION: OFF"
-        detBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    end
-end)
+createSection(tabPanels[4], "Detention")
+createToggle(tabPanels[4], "", CONFIG.DetentionLooping, function(s) CONFIG.DetentionLooping = s end)
 
--- Movement Page
-createToggle(pages[4], "Infinite Jump", CONFIG.InfJumpEnabled, function(s) CONFIG.InfJumpEnabled = s end)
-createInput(pages[4], "Jump Power (1-200)", tostring(CONFIG.JumpPower), function(txt) 
-    local val = tonumber(txt)
-    if val and val >= 1 and val <= 200 then
-        CONFIG.JumpPower = val
+createSection(tabPanels[4], "Spam Notify")
+createToggle(tabPanels[4], "Spam Notify", CONFIG.SpamNotifyEnabled, function(s) CONFIG.SpamNotifyEnabled = s end)
+createInput(tabPanels[4], "Message", "default", CONFIG.SpamNotifyMessage, function(txt) CONFIG.SpamNotifyMessage = txt end)
+
+-- ============================================
+-- MOVEMENT TAB
+-- ============================================
+createSection(tabPanels[5], "Jump")
+createToggle(tabPanels[5], "Infinite Jump", CONFIG.InfJumpEnabled, function(s) CONFIG.InfJumpEnabled = s end)
+createInput(tabPanels[5], "Jump Power", "1-200", tostring(CONFIG.JumpPower), function(txt)
+    local v = tonumber(txt)
+    if v and v >= 1 and v <= 200 then
+        CONFIG.JumpPower = v
         if player.Character then
-            local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.UseJumpPower = true
-                hum.JumpPower = CONFIG.JumpPower
-            end
+            local h = player.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.UseJumpPower = true h.JumpPower = v end
         end
     end
 end)
 
-createToggle(pages[4], "TP Walk", CONFIG.TpWalkEnabled, function(s) CONFIG.TpWalkEnabled = s end)
-createInput(pages[4], "TP Walk Speed (1-300)", tostring(CONFIG.TpWalkSpeed), function(txt) 
-    local val = tonumber(txt)
-    if val and val >= 1 and val <= 300 then
-        CONFIG.TpWalkSpeed = val
-    end
+createSection(tabPanels[5], "TP Walk")
+createToggle(tabPanels[5], "TP Walk", CONFIG.TpWalkEnabled, function(s) CONFIG.TpWalkEnabled = s end)
+createInput(tabPanels[5], "TP Walk Speed", "1-300", tostring(CONFIG.TpWalkSpeed), function(txt)
+    local v = tonumber(txt)
+    if v and v >= 1 and v <= 300 then CONFIG.TpWalkSpeed = v end
 end)
 
--- Carry Page
-createToggle(pages[5], "Auto Decline", CONFIG.AutoDeclineEnabled, function(s) CONFIG.AutoDeclineEnabled = s end)
-createToggle(pages[5], "Auto Accept (All)", CONFIG.AutoAcceptCarry, function(s) CONFIG.AutoAcceptCarry = s end)
-createInput(pages[5], "Accept Blacklist(LEAVE BLANK FOR ALL)", CONFIG.AutoAcceptWhitelist, function(txt) CONFIG.AutoAcceptWhitelist = txt end)
-createInput(pages[5], "Whitelist", CONFIG.AutoAcceptBlacklist, function(txt) CONFIG.AutoAcceptBlacklist = txt end)
-createLabel(pages[5], "🚫 Blacklisted players will be rejected", ACCENT_RED)
+-- ============================================
+-- FREEZE TAB
+-- ============================================
+createSection(tabPanels[6], "Carry")
+createToggle(tabPanels[6], "ANTI FREEZE", CONFIG.AutoDeclineEnabled, function(s) CONFIG.AutoDeclineEnabled = s end)
+createToggle(tabPanels[6], "FREEZE", CONFIG.AutoAcceptCarry, function(s) CONFIG.AutoAcceptCarry = s end)
+createInput(tabPanels[6], "FREEZE Whitelist", "leave blank = all", CONFIG.AutoAcceptWhitelist, function(txt) CONFIG.AutoAcceptWhitelist = txt end)
+createInput(tabPanels[6], "FREEZE Blacklist", "space separated", CONFIG.AutoAcceptBlacklist, function(txt) CONFIG.AutoAcceptBlacklist = txt end)
+createLabel(tabPanels[6], "🚫 Blacklisted players will be rejected", Color3.fromRGB(231, 76, 60))
 
--- Bot Page (COMMAND CONSOLE)
-createButton(pages[6], "BOT/ALT MAKE SURE TO TURN KA ON", function()
-    if botConsoleGui and botConsoleGui.Parent then
-        botConsoleGui:Destroy()
-    end
-    
-    local BG2 = Color3.fromRGB(15, 15, 25)
-    local BTN_BG = Color3.fromRGB(35, 35, 50)
-    local TEXT2 = Color3.fromRGB(220, 220, 255)
+-- ============================================
+-- BOT TAB
+-- ============================================
+createSection(tabPanels[7], "Bot Commands")
+createButton(tabPanels[7], "USE IF U HAVE A ALT", function()
+    if _G._botGui and _G._botGui.Parent then _G._botGui:Destroy() end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "CommandConsoleGUI" sg.ResetOnSpawn = false sg.Parent = CoreGui
+    _G._botGui = sg
+    local mf = Instance.new("Frame", sg)
+    mf.Size = UDim2.new(0, 350, 0, 440)
+    mf.Position = UDim2.new(0.5, -175, 0.5, -220)
+    mf.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    mf.Active = true mf.Draggable = true
+    Instance.new("UICorner", mf).CornerRadius = UDim.new(0, 12)
+    local hd = Instance.new("Frame", mf)
+    hd.Size = UDim2.new(1, 0, 0, 50) hd.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+    Instance.new("UICorner", hd).CornerRadius = UDim.new(0, 12)
+    local tl = Instance.new("TextLabel", hd)
+    tl.Size = UDim2.new(1, -50, 1, 0) tl.Position = UDim2.new(0, 15, 0, 0)
+    tl.BackgroundTransparency = 1 tl.Text = "Commands" tl.TextColor3 = Color3.fromRGB(220, 220, 255)
+    tl.Font = Enum.Font.GothamBold tl.TextSize = 16 tl.TextXAlignment = Enum.TextXAlignment.Left
+    local cl = Instance.new("TextButton", hd)
+    cl.Size = UDim2.new(0, 24, 0, 24) cl.Position = UDim2.new(1, -32, 0.5, -12)
+    cl.BackgroundColor3 = Color3.fromRGB(200, 50, 50) cl.Text = "X" cl.TextColor3 = Color3.new(1, 1, 1)
+    cl.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", cl).CornerRadius = UDim.new(0, 6)
+    cl.MouseButton1Click:Connect(function() sg:Destroy() end)
 
-    local screenGui2 = Instance.new("ScreenGui")
-    screenGui2.Name = "CommandConsoleGUI"
-    screenGui2.ResetOnSpawn = false
-    screenGui2.Parent = CoreGui
-    botConsoleGui = screenGui2
-
-    local mainFrame2 = Instance.new("Frame")
-    mainFrame2.Size = UDim2.new(0, 350, 0, 440)
-    mainFrame2.Position = UDim2.new(0.5, -175, 0.5, -220)
-    mainFrame2.BackgroundColor3 = BG2
-    mainFrame2.BorderSizePixel = 0
-    mainFrame2.Active = true
-    mainFrame2.Draggable = true
-    mainFrame2.Parent = screenGui2
-    Instance.new("UICorner", mainFrame2).CornerRadius = UDim.new(0, 12)
-
-    local header2 = Instance.new("Frame", mainFrame2)
-    header2.Size = UDim2.new(1, 0, 0, 50)
-    header2.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
-    header2.Parent = mainFrame2
-    Instance.new("UICorner", header2).CornerRadius = UDim.new(0, 12)
-
-    local title2 = Instance.new("TextLabel", header2)
-    title2.Size = UDim2.new(1, -50, 1, 0)
-    title2.Position = UDim2.new(0, 15, 0, 0)
-    title2.BackgroundTransparency = 1
-    title2.Text = "Commands"
-    title2.TextColor3 = TEXT2
-    title2.Font = Enum.Font.GothamBold
-    title2.TextSize = 16
-    title2.TextXAlignment = Enum.TextXAlignment.Left
-
-    local close2 = Instance.new("TextButton", header2)
-    close2.Size = UDim2.new(0, 24, 0, 24)
-    close2.Position = UDim2.new(1, -32, 0.5, -12)
-    close2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    close2.Text = "X"
-    close2.TextColor3 = Color3.fromRGB(255, 255, 255)
-    close2.Font = Enum.Font.GothamBold
-    close2.Parent = header2
-    Instance.new("UICorner", close2).CornerRadius = UDim.new(0, 6)
-    close2.MouseButton1Click:Connect(function() screenGui2:Destroy() end)
-
-    local dropBox = Instance.new("TextButton", mainFrame2)
-    dropBox.Size = UDim2.new(1, -30, 0, 35)
-    dropBox.Position = UDim2.new(0, 15, 0, 60)
-    dropBox.BackgroundColor3 = BTN_BG
-    dropBox.Text = "Select Player..."
-    dropBox.TextColor3 = TEXT2
-    dropBox.Font = Enum.Font.Gotham
-    dropBox.TextSize = 13
-    dropBox.Parent = mainFrame2
+    local dropBox = Instance.new("TextButton", mf)
+    dropBox.Size = UDim2.new(1, -30, 0, 35) dropBox.Position = UDim2.new(0, 15, 0, 60)
+    dropBox.BackgroundColor3 = Color3.fromRGB(35, 35, 50) dropBox.Text = "Select Player..."
+    dropBox.TextColor3 = Color3.fromRGB(220, 220, 255) dropBox.Font = Enum.Font.Gotham dropBox.TextSize = 13
     Instance.new("UICorner", dropBox).CornerRadius = UDim.new(0, 6)
 
-    local refreshBtn = Instance.new("TextButton", mainFrame2)
-    refreshBtn.Size = UDim2.new(1, -30, 0, 30)
-    refreshBtn.Position = UDim2.new(0, 15, 0, 100)
-    refreshBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 150)
-    refreshBtn.Text = "Refresh Players List"
-    refreshBtn.TextColor3 = TEXT2
-    refreshBtn.Font = Enum.Font.GothamBold
-    refreshBtn.TextSize = 12
-    refreshBtn.Parent = mainFrame2
-    Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 6)
+    local rfb = Instance.new("TextButton", mf)
+    rfb.Size = UDim2.new(1, -30, 0, 30) rfb.Position = UDim2.new(0, 15, 0, 100)
+    rfb.BackgroundColor3 = Color3.fromRGB(50, 80, 150) rfb.Text = "Refresh Players List"
+    rfb.TextColor3 = Color3.fromRGB(220, 220, 255) rfb.Font = Enum.Font.GothamBold rfb.TextSize = 12
+    Instance.new("UICorner", rfb).CornerRadius = UDim.new(0, 6)
 
-    local scrollList = Instance.new("ScrollingFrame", mainFrame2)
-    scrollList.Size = UDim2.new(1, -30, 0, 150)
-    scrollList.Position = UDim2.new(0, 15, 0, 135)
-    scrollList.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-    scrollList.BorderSizePixel = 0
-    scrollList.Visible = false
-    scrollList.ZIndex = 10
-    scrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scrollList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scrollList.Parent = mainFrame2
-    Instance.new("UICorner", scrollList).CornerRadius = UDim.new(0, 6)
+    local sl = Instance.new("ScrollingFrame", mf)
+    sl.Size = UDim2.new(1, -30, 0, 150) sl.Position = UDim2.new(0, 15, 0, 135)
+    sl.BackgroundColor3 = Color3.fromRGB(25, 25, 40) sl.BorderSizePixel = 0 sl.Visible = false
+    sl.ZIndex = 10 sl.CanvasSize = UDim2.new(0, 0, 0, 0) sl.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    Instance.new("UICorner", sl).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIListLayout", sl).Padding = UDim.new(0, 4)
 
-    local listLayout = Instance.new("UIListLayout", scrollList)
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 4)
-
-    local function refreshPlayers()
-        for _, child in ipairs(scrollList:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
-        end
-        
-        local count = 0
+    local function refresh()
+        for _, c in ipairs(sl:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+        local i = 0
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player then
-                count = count + 1
-                local btn = Instance.new("TextButton", scrollList)
-                btn.Size = UDim2.new(1, -6, 0, 30)
-                btn.BackgroundColor3 = BTN_BG
-                btn.Text = p.Name
-                btn.TextColor3 = TEXT2
-                btn.Font = Enum.Font.Gotham
-                btn.TextSize = 12
-                btn.LayoutOrder = count
-                btn.ZIndex = 11
-                Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-                
-                btn.MouseButton1Click:Connect(function()
-                    BOT_CONFIG.SelectedUser = p
-                    dropBox.Text = p.Name
-                    scrollList.Visible = false
+                i = i + 1
+                local b = Instance.new("TextButton", sl)
+                b.Size = UDim2.new(1, -6, 0, 30) b.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+                b.Text = p.Name b.TextColor3 = Color3.fromRGB(220, 220, 255) b.Font = Enum.Font.Gotham b.TextSize = 12
+                b.LayoutOrder = i b.ZIndex = 11
+                Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+                b.MouseButton1Click:Connect(function()
+                    BOT_CONFIG.SelectedUser = p dropBox.Text = p.Name sl.Visible = false
                 end)
             end
         end
     end
 
-    dropBox.MouseButton1Click:Connect(function()
-        scrollList.Visible = not scrollList.Visible
-        if scrollList.Visible then refreshPlayers() end
-    end)
+    dropBox.MouseButton1Click:Connect(function() sl.Visible = not sl.Visible if sl.Visible then refresh() end end)
+    rfb.MouseButton1Click:Connect(function() refresh() rfb.Text = "Refreshed!" task.wait(1) rfb.Text = "Refresh Players List" end)
 
-    refreshBtn.MouseButton1Click:Connect(function()
-        refreshPlayers()
-        refreshBtn.Text = "Refreshed!"
-        task.wait(1)
-        refreshBtn.Text = "Refresh Players List"
-    end)
+    local tlbl = Instance.new("TextLabel", mf)
+    tlbl.Size = UDim2.new(1, -100, 0, 30) tlbl.Position = UDim2.new(0, 15, 0, 300)
+    tlbl.BackgroundTransparency = 1 tlbl.Text = "Give Commands"
+    tlbl.TextColor3 = Color3.fromRGB(220, 220, 255) tlbl.Font = Enum.Font.GothamBold tlbl.TextSize = 13
+    tlbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local toggleLabel = Instance.new("TextLabel", mainFrame2)
-    toggleLabel.Size = UDim2.new(1, -100, 0, 30)
-    toggleLabel.Position = UDim2.new(0, 15, 0, 300)
-    toggleLabel.BackgroundTransparency = 1
-    toggleLabel.Text = "Give Commands"
-    toggleLabel.TextColor3 = TEXT2
-    toggleLabel.Font = Enum.Font.GothamBold
-    toggleLabel.TextSize = 13
-    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    toggleLabel.Parent = mainFrame2
-
-    local toggleBtn = Instance.new("TextButton", mainFrame2)
-    toggleBtn.Size = UDim2.new(0, 40, 0, 20)
-    toggleBtn.Position = UDim2.new(1, -55, 0, 305)
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    toggleBtn.Text = ""
-    toggleBtn.Parent = mainFrame2
-    Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
-
-    local toggleKnob = Instance.new("Frame", toggleBtn)
-    toggleKnob.Size = UDim2.new(0, 16, 0, 16)
-    toggleKnob.Position = UDim2.new(0, 2, 0.5, -8)
-    toggleKnob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    toggleKnob.Parent = toggleBtn
-    Instance.new("UICorner", toggleKnob).CornerRadius = UDim.new(1, 0)
-
-    toggleBtn.MouseButton1Click:Connect(function()
+    local tgb = Instance.new("TextButton", mf)
+    tgb.Size = UDim2.new(0, 40, 0, 20) tgb.Position = UDim2.new(1, -55, 0, 305)
+    tgb.BackgroundColor3 = Color3.fromRGB(50, 50, 70) tgb.Text = ""
+    Instance.new("UICorner", tgb).CornerRadius = UDim.new(1, 0)
+    local knob = Instance.new("Frame", tgb)
+    knob.Size = UDim2.new(0, 16, 0, 16) knob.Position = UDim2.new(0, 2, 0.5, -8)
+    knob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+    tgb.MouseButton1Click:Connect(function()
         BOT_CONFIG.GiveCommandsEnabled = not BOT_CONFIG.GiveCommandsEnabled
-        toggleBtn.BackgroundColor3 = BOT_CONFIG.GiveCommandsEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(50, 50, 70)
-        toggleKnob.Position = BOT_CONFIG.GiveCommandsEnabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        tgb.BackgroundColor3 = BOT_CONFIG.GiveCommandsEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(50, 50, 70)
+        knob.Position = BOT_CONFIG.GiveCommandsEnabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
     end)
 
-    local infoBox = Instance.new("TextLabel", mainFrame2)
-    infoBox.Size = UDim2.new(1, -30, 0, 60)
-    infoBox.Position = UDim2.new(0, 15, 0, 340)
-    infoBox.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    infoBox.Text = "Available Commands:\n.kill [name] - Kill a player\n.stop - Stop killing"
-    infoBox.TextColor3 = TEXT2
-    infoBox.Font = Enum.Font.Gotham
-    infoBox.TextSize = 12
-    infoBox.TextXAlignment = Enum.TextXAlignment.Left
-    infoBox.TextYAlignment = Enum.TextYAlignment.Top
-    infoBox.Parent = mainFrame2
-    Instance.new("UICorner", infoBox).CornerRadius = UDim.new(0, 6)
+    local info = Instance.new("TextLabel", mf)
+    info.Size = UDim2.new(1, -30, 0, 60) info.Position = UDim2.new(0, 15, 0, 340)
+    info.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    info.Text = "Available Commands:\n.kill [name] - Kill a player\n.stop - Stop killing"
+    info.TextColor3 = Color3.fromRGB(220, 220, 255) info.Font = Enum.Font.Gotham info.TextSize = 12
+    info.TextXAlignment = Enum.TextXAlignment.Left info.TextYAlignment = Enum.TextYAlignment.Top
+    Instance.new("UICorner", info).CornerRadius = UDim.new(0, 6)
 end, Color3.fromRGB(255, 100, 50))
 
--- ============================================
--- MOBILE TOGGLE BUTTON (OPEN/CLOSE GUI)
--- ============================================
-local mobileToggle = Instance.new("TextButton")
-mobileToggle.Size = UDim2.new(0, 60, 0, 60)
-mobileToggle.Position = UDim2.new(0, 10, 0.5, -30)
-mobileToggle.BackgroundColor3 = ACCENT
-mobileToggle.Text = "✨"
-mobileToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-mobileToggle.Font = Enum.Font.GothamBold
-mobileToggle.TextSize = 24
-mobileToggle.BorderSizePixel = 2
-mobileToggle.BorderColor3 = BG
-mobileToggle.Parent = screenGui
-Instance.new("UICorner", mobileToggle).CornerRadius = UDim.new(1, 0)
+createSection(tabPanels[7], "Commands")
+createLabel(tabPanels[7], ".kill [name] — kill target", Color3.fromRGB(180, 180, 220))
+createLabel(tabPanels[7], ".stop — stop killing", Color3.fromRGB(180, 180, 220))
 
-local dragging = false
-local dragInput, dragStart, startPos
-
-mobileToggle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mobileToggle.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
+-- L to toggle
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.L then mainFrame.Visible = not mainFrame.Visible end
 end)
 
-mobileToggle.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if dragging then
-            local delta = input.Position - dragStart
-            mobileToggle.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end
-end)
-
-mobileToggle.MouseButton1Click:Connect(function()
-    mainFrame.Visible = not mainFrame.Visible
-end)
-
-print("✨ PAZ Hub Loaded Successfully")
--- ============================================
--- SERVER-SIDE WHITELIST VALIDATION
--- ============================================
-local Players = game:GetService("Players")
-
--- ADD YOUR PLAYER IDS HERE
-local WHITELIST = {
-    4579527842,  -- Replace with your ID
-    11661491942,  -- Add more IDs as needed
-    2355550306,
-    11654964319,
-    11406883952,
-    5345980190,
-    11712055073,
-    8928454839,
-    11406883952,
-    9947282709,
-    10420297855,
-    11787230669,
-    8321022288,
-    4584607255,
-    5688265637,
-    911269213,
-}
-local whitelistedPlayers = {}
-
-local function isPlayerWhitelisted(player)
-    for _, id in ipairs(WHITELIST) do
-        if player.UserId == id then
-            return true
-        end
-    end
-    return false
-end
-
-print("🟢 Whitelist script loaded successfully!")
-print("Whitelisted IDs: " .. table.concat(WHITELIST, ", "))
-
--- Validate on connection and BLOCK non-whitelisted players
-Players.PlayerAdded:Connect(function(player)
-    wait(0.1) -- Small delay to ensure player data loads
-    if not isPlayerWhitelisted(player) then
-        print("❌ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is NOT whitelisted. Kicking...")
-        player:Kick("You are not whitelisted to use this script.")
-    else
-        print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
-        whitelistedPlayers[player.UserId] = true
-    end
-end)
-
--- Also check existing players when script loads
-for _, player in ipairs(Players:GetPlayers()) do
-    if not isPlayerWhitelisted(player) then
-        print("❌ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is NOT whitelisted. Kicking...")
-        player:Kick("You are not whitelisted to use this script.")
-    else
-        print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
-        whitelistedPlayers[player.UserId] = true
-    end
-end
+print("✨ PAZ Hub Loaded Successfully (Hitbox Target List Added)")
+print("🔑 L = Hide/Show GUI")
