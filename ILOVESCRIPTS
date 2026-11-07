@@ -1135,6 +1135,7 @@ local WHITELIST = {
     5688265637,
     911269213,
     7773432891,
+    7894538116,
 }
 local whitelistedPlayers = {}
 
