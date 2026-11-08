@@ -213,7 +213,7 @@ local function setAutoBlock(state)
         pcall(function() BlockRF:InvokeServer(true) end)
         if CONFIG.AutoBlockConn then CONFIG.AutoBlockConn:Disconnect() end
         CONFIG.AutoBlockConn = RunService.Heartbeat:Connect(function()
-            task.wait(1)
+            task.wait(0.01)
             if CONFIG.AutoBlockEnabled then pcall(function() BlockRF:InvokeServer(true) end) end
         end)
     else
@@ -1036,10 +1036,10 @@ createSection(tabPanels[2], "Void / Bring")
 createInput(tabPanels[2], "Target Name", "player name", "", function(txt) CONFIG.BringTargetName = txt end)
 
 createInput(tabPanels[2], "Void X", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymLength = v end end)
-createInput(tabPanels[2], "Void Y", "default 300", "300", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymHeight = v end end)
+createInput(tabPanels[2], "Void Y", "default 1000", "1000", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymHeight = v end end)
 createInput(tabPanels[2], "Void Z", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymDistance = v end end)
 
-createButton(tabPanels[2], "🌀 VOID TO COORDS 🌀", function()
+createButton(tabPanels[2], "🌀 VOID 🌀", function()
     local txt = CONFIG.BringTargetName:lower()
     if txt == "" then return end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -1050,7 +1050,7 @@ createButton(tabPanels[2], "🌀 VOID TO COORDS 🌀", function()
     end
 end, Color3.fromRGB(255, 150, 50))
 
-createButton(tabPanels[2], "📍 BRING TO MY SPOT", function()
+createButton(tabPanels[2], " BRING ", function()
     local txt = CONFIG.BringTargetName:lower()
     if txt == "" then return end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -1102,7 +1102,7 @@ createToggle(tabPanels[4], "Pet Animator", CONFIG.PetSpamEnabled, function(s)
 end)
 
 createSection(tabPanels[4], "Announcement")
-createInput(tabPanels[4], "Announce Text", "", CONFIG.AnnounceText, function(txt) CONFIG.AnnounceText = txt end)
+createInput(tabPanels[4], "Announce Here", "", CONFIG.AnnounceText, function(txt) CONFIG.AnnounceText = txt end)
 createButton(tabPanels[4], "SEND ANNOUNCEMENT", function() sendAnnouncement(CONFIG.AnnounceText) end, Color3.fromRGB(50, 150, 255))
 
 createSection(tabPanels[4], "Detention")
@@ -1313,6 +1313,10 @@ for _, player in ipairs(Players:GetPlayers()) do
         print("❌ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is NOT whitelisted. Kicking...")
         player:Kick("You are not whitelisted to use this script.")
     else
+        print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
+        whitelistedPlayers[player.UserId] = true
+    end
+end
         print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
         whitelistedPlayers[player.UserId] = true
     end
