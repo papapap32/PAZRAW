@@ -126,28 +126,44 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- GLOBAL HELPERS
+-- GLOBAL LIST HELPERS (From Auto Tools)
 -- ============================================
-local function isNameInList(plr, listStr)
-    if not plr or listStr == "" then return false end
-    local name = string.lower(plr.Name)
-    local disp = string.lower(plr.DisplayName)
-    local search = string.lower(listStr)
-    
-    for word in string.gmatch(search, "[^,%s]+") do
-        if word == name or word == disp or string.find(name, word, 1, true) or string.find(disp, word, 1, true) then
-            return true
-        end
+local function parseList(str)
+    local t = {}
+    if str == "" then return t end
+    for w in str:gmatch("[^,%s]+") do table.insert(t, w:lower()) end
+    return t
+end
+
+local function isTarget(n, targetList)
+    if #targetList == 0 then return true end
+    local ln = n:lower()
+    for _, v in ipairs(targetList) do
+        if ln:find(v, 1, true) then return true end
+    end
+    return false
+end
+
+local function isSafe(n, safeList)
+    local ln = n:lower()
+    for _, v in ipairs(safeList) do
+        if ln:find(v, 1, true) then return true end
     end
     return false
 end
 
 local function isSafePlayer(plr)
-    return isNameInList(plr, CONFIG.GlobalWhitelist)
+    if not plr then return false end
+    local whitelist = parseList(CONFIG.GlobalWhitelist)
+    if #whitelist == 0 then return false end
+    return isSafe(plr.Name, whitelist) or isSafe(plr.DisplayName, whitelist)
 end
 
-local function isBlacklisted(plr)
-    return isNameInList(plr, CONFIG.GlobalBlacklist)
+local function isBlacklistedPlayer(plr)
+    if not plr then return false end
+    local blacklist = parseList(CONFIG.GlobalBlacklist)
+    if #blacklist == 0 then return false end
+    return isSafe(plr.Name, blacklist) or isSafe(plr.DisplayName, blacklist)
 end
 
 local function ResetAllHitboxes()
@@ -675,8 +691,6 @@ task.spawn(function()
         if CONFIG.HitboxEnabled then
             local myChar=player.Character 
             local myHRP=myChar and myChar:FindFirstChild("HumanoidRootPart")
-            local ct=nil 
-            cd=math.huge
             
             if myHRP then 
                 for _,p in ipairs(Players:GetPlayers()) do
@@ -685,44 +699,22 @@ task.spawn(function()
                         local h=p.Character:FindFirstChildOfClass("Humanoid")
                         if hrp and h and h.Health>0 then
                             if not isSafePlayer(p) then 
-                                local d=(hrp.Position-myHRP.Position).Magnitude 
-                                if #tl==0 then 
-                                    ct=p 
-                                else 
-                                    if d<=cd then cd=d ct=p end 
+                                hrp.Size=Vector3.new(CONFIG.HitboxSize,CONFIG.HitboxSize,CONFIG.HitboxSize)
+                                hrp.Transparency=CONFIG.HitboxVisibility 
+                                hrp.BrickColor=BrickColor.new("Really red") 
+                                hrp.Material=Enum.Material.ForceField 
+                                hrp.CanCollide=false
+                                local om=hrp:FindFirstChild("KillAuraSphere") if om then om:Destroy() end
+                                local s=Instance.new("SpecialMesh") s.MeshType=Enum.MeshType.Sphere s.Name="KillAuraSphere" s.Parent=hrp
+                            else
+                                if not (CONFIG.KillAuraEnabled) then
+                                    hrp.Size=Vector3.new(2,2,1) 
+                                    hrp.Transparency=1 
                                 end
                             end
                         end
                     end
                 end 
-            end
-            
-            for _,p in ipairs(Players:GetPlayers()) do
-                if p~=player and p.Character then
-                    local hrp=p.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local om=hrp:FindFirstChild("KillAuraSphere") if om then om:Destroy() end
-                        local shouldExpand = false
-                        
-                        if not isSafePlayer(p) then
-                            shouldExpand = true 
-                        end
-
-                        if shouldExpand then
-                            hrp.Size=Vector3.new(CONFIG.HitboxSize,CONFIG.HitboxSize,CONFIG.HitboxSize)
-                            hrp.Transparency=CONFIG.HitboxVisibility 
-                            hrp.BrickColor=BrickColor.new("Really red") 
-                            hrp.Material=Enum.Material.ForceField 
-                            hrp.CanCollide=false
-                            local s=Instance.new("SpecialMesh") s.MeshType=Enum.MeshType.Sphere s.Name="KillAuraSphere" s.Parent=hrp
-                        else 
-                            if not (CONFIG.KillAuraEnabled and p == ct) then
-                                hrp.Size=Vector3.new(2,2,1) 
-                                hrp.Transparency=1 
-                            end
-                        end
-                    end
-                end
             end
             task.wait(0.1)
         else task.wait(0.5) end
@@ -809,12 +801,13 @@ RunService.Heartbeat:Connect(function()
     if CONFIG.AutoAcceptCarry and CarryRequest then
         for _,p in ipairs(Players:GetPlayers()) do
             if p ~= player then
-                local isBlacklisted = isNameInList(p, CONFIG.GlobalBlacklist)
-                local isWhitelisted = isNameInList(p, CONFIG.GlobalWhitelist)
+                local isBlacklisted = isBlacklistedPlayer(p)
+                local isWhitelisted = isSafePlayer(p)
+                local whitelistTable = parseList(CONFIG.GlobalWhitelist)
                 
                 local shouldFreeze = false
                 if not isBlacklisted then
-                    if CONFIG.GlobalWhitelist == "" or isWhitelisted then
+                    if #whitelistTable == 0 or isWhitelisted then
                         shouldFreeze = true
                     end
                 end
@@ -1133,7 +1126,6 @@ createInput(tabPanels[1], "Blacklist", "names...", CONFIG.GlobalBlacklist, funct
     CONFIG.GlobalBlacklist = txt 
 end)
 
-
 -- ============================================
 -- DEFENSE TAB
 -- ============================================
@@ -1402,6 +1394,7 @@ end)
 
 print("✨ PAZ Hub Loaded Successfully")
 print("🔑 L = Hide/Show GUI")
+
 -- ============================================
 -- SERVER-SIDE WHITELIST VALIDATION
 -- ============================================
