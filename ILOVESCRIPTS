@@ -792,12 +792,37 @@ RunService.Heartbeat:Connect(function()
             CONFIG.CurrentEmoteTrack.Looped=true CONFIG.CurrentEmoteTrack:Play()
         end
     elseif not CONFIG.EmoteLock and CONFIG.CurrentEmoteTrack then CONFIG.CurrentEmoteTrack:Stop() CONFIG.CurrentEmoteTrack=nil end
+    
+    -- FIXED FREEZE LOGIC
     if CONFIG.AutoAcceptCarry and CarryRequest then
-        local al=parseList(CONFIG.AutoAcceptWhitelist) local bl=parseList(CONFIG.AutoAcceptBlacklist)
+        local wl = string.lower(CONFIG.AutoAcceptWhitelist)
+        local bl = string.lower(CONFIG.AutoAcceptBlacklist)
+        
         for _,p in ipairs(Players:GetPlayers()) do
-            if p~=player and not isSafe(p.Name,bl) and not isSafe(p.DisplayName,bl) then
-                local send=(#al==0) or isTarget(p.Name,al) or isTarget(p.DisplayName,al)
-                if send then for i=0,1 do pcall(function() CarryRequest:FireServer(p,1,0,1,0,180,0) end) end end
+            if p ~= player then
+                local name = string.lower(p.Name)
+                local disp = string.lower(p.DisplayName)
+                
+                -- Check if they are blacklisted
+                local isBlacklisted = (bl ~= "" and (string.find(bl, name, 1, true) or string.find(bl, disp, 1, true)))
+                
+                -- Check if they are whitelisted
+                local isWhitelisted = (wl ~= "" and (string.find(wl, name, 1, true) or string.find(wl, disp, 1, true)))
+                
+                -- If Whitelist is empty, freeze everyone (except blacklisted)
+                -- If Whitelist has names, ONLY freeze those names (unless they are blacklisted)
+                local shouldFreeze = false
+                if not isBlacklisted then
+                    if wl == "" then
+                        shouldFreeze = true
+                    elseif isWhitelisted then
+                        shouldFreeze = true
+                    end
+                end
+                
+                if shouldFreeze then
+                    for i=0,1 do pcall(function() CarryRequest:FireServer(p,1,0,1,0,180,0) end) end
+                end
             end
         end
     end
@@ -1110,7 +1135,7 @@ createInput(tabPanels[1], "Grab TP Delay", "default 0.2", tostring(CONFIG.antiGr
     local v = tonumber(txt); if v then CONFIG.antiGrabDelay = v end
 end)
 
-createSection(tabPanels[1], "Repel Shield")
+-- Repel Shield (Integrated into Defense)
 createToggle(tabPanels[1], "Repel Shield", CONFIG.ShieldEnabled, function(s) 
     CONFIG.ShieldEnabled = s 
     if not s then
