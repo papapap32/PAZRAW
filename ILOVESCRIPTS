@@ -59,7 +59,7 @@ local CONFIG = {
     -- VOID & BRING CONFIG
     BringTargetName="",
     InstaGymLength = 0,
-    InstaGymHeight = 1000,
+    InstaGymHeight = 300,
     InstaGymDistance = 0,
     -- NO ANIM CONFIG
     NoAnimEnabled = false,
@@ -1082,7 +1082,7 @@ createSection(tabPanels[2], "Void / Bring")
 createInput(tabPanels[2], "Target Name", "player name", "", function(txt) CONFIG.BringTargetName = txt end)
 
 createInput(tabPanels[2], "Void X", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymLength = v end end)
-createInput(tabPanels[2], "Void Y", "default 1000", "1000", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymHeight = v end end)
+createInput(tabPanels[2], "Void Y", "default 300", "300", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymHeight = v end end)
 createInput(tabPanels[2], "Void Z", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymDistance = v end end)
 
 createButton(tabPanels[2], "🌀 VOID 🌀", function()
