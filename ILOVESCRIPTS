@@ -40,7 +40,7 @@ local GrabRF = RF and RF:FindFirstChild("Grab")
 -- ============================================
 local CONFIG = {
     PetSpamEnabled=false, PetCustomText="TFK-THE FEARED KILLERS", PetTypeSpeed=0.2, TargetPet=nil, PetCurrentIndex=0, PetLastUpdate=0, PetLastSentName="",
-    EmoteLock=false, SavedEmoteID="", CurrentEmoteTrack=nil, AnnounceText="Hello Server!", DetentionLooping=false,
+    EmoteLock=false, SavedEmoteID="", CurrentEmoteTrack=nil, AnnounceText="Announce Here", DetentionLooping=false,
     AntiHitEnabled=false, AntiGrabEnabled=false, AntiGrabCooldown=false,
     AntiHit15Enabled=false, AntiHit15Cooldown=false, CombatBreakerEnabled=false,
     SafeList="", Cooldown=false, LastHealth=100,
@@ -59,7 +59,7 @@ local CONFIG = {
     -- VOID & BRING CONFIG
     BringTargetName="",
     InstaGymLength = 0,
-    InstaGymHeight = 300,
+    InstaGymHeight = 1000,
     InstaGymDistance = 0,
     -- NO ANIM CONFIG
     NoAnimEnabled = false,
