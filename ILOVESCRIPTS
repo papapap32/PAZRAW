@@ -288,22 +288,22 @@ RunService.Heartbeat:Connect(function()
             local tHum = p.Character:FindFirstChildOfClass("Humanoid")
             
             if tHRP and tHum and tHum.Health > 0 then
-                -- CHECK WHITELIST HERE
-                if isSafePlayer(p) then continue end
-                
-                local dist = (tHRP.Position - hrp.Position).Magnitude
-                
-                if dist <= CONFIG.ShieldSize then
-                    isPushing = true
+                -- WHITELIST CHECK: If their name is in the Defense tab whitelist, skip them!
+                if not isSafePlayer(p) then
+                    local dist = (tHRP.Position - hrp.Position).Magnitude
                     
-                    local myLook = hrp.CFrame.LookVector
-                    local pushPos = hrp.Position + (myLook * (CONFIG.ShieldSize + CONFIG.ShieldPushDistance))
-                    
-                    performAutoBring(p, pushPos, function()
-                        isPushing = false
-                    end)
-                    
-                    break
+                    if dist <= CONFIG.ShieldSize then
+                        isPushing = true
+                        
+                        local myLook = hrp.CFrame.LookVector
+                        local pushPos = hrp.Position + (myLook * (CONFIG.ShieldSize + CONFIG.ShieldPushDistance))
+                        
+                        performAutoBring(p, pushPos, function()
+                            isPushing = false
+                        end)
+                        
+                        break
+                    end
                 end
             end
         end
