@@ -1,4 +1,4 @@
-local Players = game:GetService("Players")
+ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -288,6 +288,9 @@ RunService.Heartbeat:Connect(function()
             local tHum = p.Character:FindFirstChildOfClass("Humanoid")
             
             if tHRP and tHum and tHum.Health > 0 then
+                -- CHECK WHITELIST HERE
+                if isSafePlayer(p) then continue end
+                
                 local dist = (tHRP.Position - hrp.Position).Magnitude
                 
                 if dist <= CONFIG.ShieldSize then
