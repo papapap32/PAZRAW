@@ -28,7 +28,7 @@ local RequestPrompt = ReplicatedStorage:FindFirstChild("RequestPrompt")
 
 local CombatService = ReplicatedStorage:FindFirstChild("Packages") 
     and ReplicatedStorage.Packages:FindFirstChild("Knit") 
-    and ReplicatedStorage.Packages.Knit:FindFirstChild("Services") 
+    and ReplicatedStorage.Packages:FindFirstChild("Services") 
     and ReplicatedStorage.Packages.Knit.Services:FindFirstChild("CombatService")
 local RF = CombatService and CombatService:FindFirstChild("RF")
 local PunchDo = RF and RF:FindFirstChild("PunchDo")
@@ -63,6 +63,10 @@ local CONFIG = {
     InstaGymDistance = 0,
     -- NO ANIM CONFIG
     NoAnimEnabled = false,
+    -- SHIELD CONFIG
+    ShieldEnabled = false,
+    ShieldSize = 15,
+    ShieldPushDistance = 4,
 }
 local kaClickInterval = 1 / CONFIG.KillAuraCPS
 
@@ -70,25 +74,20 @@ local kaClickInterval = 1 / CONFIG.KillAuraCPS
 local EVENT_X = 53.5
 local EVENT_Y = 4.0
 local EVENT_Z = 118.2
+local isPushing = false -- Shield lock
 
 -- ============================================
 -- NO ANIM DATA
 -- ============================================
 local BLOCKED_IDS = {
-    -- Original Combat Anims
     ["123362156306784"] = true, ["97714758682034"] = true, ["82990592496976"] = true,
     ["134836817604323"] = true, ["118382180791352"] = true, ["73625276933186"] = true,
     ["137365752663363"] = true, ["78215114906302"] = true, ["92061475973367"] = true,
     ["11744431757364"] = true, ["7110207492522"] = true, ["140641468646180"] = true,
-    -- Picture 1 (Last 4)
     ["91583402383897"] = true, ["122257458498464"] = true, ["115782978038472"] = true, ["102357151085774"] = true,
-    -- Picture 2 (Last 4)
     ["86966347478990"] = true, ["72847740724244"] = true, ["89291044159567"] = true, ["85072802509267"] = true,
-    -- Picture 3 (Last 4)
     ["140420997566896"] = true, ["72156524420052"] = true, ["90109303183886"] = true, ["1213177424961015"] = true,
-    -- Picture 4 (Last 4)
     ["134381957936463"] = true, ["96782586659138"] = true, ["115131384989552"] = true, ["108132276457136"] = true,
-    -- Picture 5 (Last 4)
     ["136178279851585"] = true, ["122662653497227"] = true, ["89465790124471"] = true, ["85946347478990"] = true,
 }
 
@@ -106,7 +105,6 @@ local function isBlocked(track)
     return (id and BLOCKED_IDS[id]) or (name and BLOCKED_NAMES[name])
 end
 
--- Strict 60FPS Block Loop
 RunService.RenderStepped:Connect(function()
     if not CONFIG.NoAnimEnabled or not player.Character then return end
     local hum = player.Character:FindFirstChildOfClass("Humanoid")
@@ -202,18 +200,24 @@ local function performVoid(targetPlayer)
     end)
 end
 
-local function performAutoBring(targetPlayer)
+local function performAutoBring(targetPlayer, customDestPos, onComplete)
     task.spawn(function()
-        if not targetPlayer or not targetPlayer.Character then return end
+        if not targetPlayer or not targetPlayer.Character then 
+            if onComplete then onComplete() end
+            return 
+        end
         local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        if not hrp then 
+            if onComplete then onComplete() end
+            return 
+        end
 
-        local myPos = hrp.Position
+        local destPos = customDestPos or hrp.Position
         local mySpot = hrp.CFrame
 
-        local argX = EVENT_X - myPos.X
-        local argY = EVENT_Y - myPos.Y
-        local argZ = EVENT_Z - myPos.Z
+        local argX = EVENT_X - destPos.X
+        local argY = EVENT_Y - destPos.Y
+        local argZ = EVENT_Z - destPos.Z
 
         pcall(function()
             if CarryRequest then
@@ -222,9 +226,9 @@ local function performAutoBring(targetPlayer)
                 }))
             end
         end)
-        task.wait(0.12)
+        task.wait(0)
         pcall(function() if EventTeleportEvent then EventTeleportEvent:FireServer() end end)
-        task.wait(0.08)
+        task.wait(0)
         pcall(function() if StopCarry then StopCarry:FireServer() end end)
 
         pcall(function()
@@ -237,7 +241,11 @@ local function performAutoBring(targetPlayer)
         local startTime = tick()
         local conn
         conn = RunService.Heartbeat:Connect(function()
-            if tick() - startTime > 0.8 then conn:Disconnect() return end
+            if tick() - startTime > 0.3 then 
+                conn:Disconnect() 
+                if onComplete then onComplete() end
+                return 
+            end
             local h = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if h then
                 pcall(function()
@@ -248,6 +256,56 @@ local function performAutoBring(targetPlayer)
         end)
     end)
 end
+
+-- ============================================
+-- SHIELD LOOP
+-- ============================================
+RunService.Heartbeat:Connect(function()
+    if not CONFIG.ShieldEnabled or not player.Character then return end
+    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local box = hrp:FindFirstChild("RepelShieldBox")
+    if not box then
+        box = Instance.new("Part")
+        box.Name = "RepelShieldBox"
+        box.Shape = Enum.PartType.Ball
+        box.Anchored = true
+        box.CanCollide = false
+        box.Material = Enum.Material.ForceField
+        box.Color = Color3.fromRGB(0, 150, 255)
+        box.Transparency = 0.7
+        box.Parent = hrp
+    end
+    box.Size = Vector3.new(CONFIG.ShieldSize * 2, CONFIG.ShieldSize * 2, CONFIG.ShieldSize * 2)
+    box.CFrame = hrp.CFrame
+
+    if isPushing then return end
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local tHRP = p.Character:FindFirstChild("HumanoidRootPart")
+            local tHum = p.Character:FindFirstChildOfClass("Humanoid")
+            
+            if tHRP and tHum and tHum.Health > 0 then
+                local dist = (tHRP.Position - hrp.Position).Magnitude
+                
+                if dist <= CONFIG.ShieldSize then
+                    isPushing = true
+                    
+                    local myLook = hrp.CFrame.LookVector
+                    local pushPos = hrp.Position + (myLook * (CONFIG.ShieldSize + CONFIG.ShieldPushDistance))
+                    
+                    performAutoBring(p, pushPos, function()
+                        isPushing = false
+                    end)
+                    
+                    break
+                end
+            end
+        end
+    end
+end)
 
 -- ============================================
 -- AUTO BLOCK
@@ -348,9 +406,6 @@ local function preloadTpWalkAnim()
     end
 end
 
--- ============================================
--- NEW ANTI-GRAB
--- ============================================
 local function setupAntiGrab(char)
     local hum = char:WaitForChild("Humanoid", 10)
     local hrp = char:WaitForChild("HumanoidRootPart", 10)
@@ -559,7 +614,6 @@ local function doClick()
     end
 end
 
--- KILL AURA
 task.spawn(function()
     while task.wait() do
         if CONFIG.KillAuraEnabled then
@@ -593,7 +647,6 @@ task.spawn(function()
     end
 end)
 
--- HITBOX
 task.spawn(function()
     while task.wait() do
         if CONFIG.HitboxEnabled then
@@ -661,20 +714,17 @@ task.spawn(function()
     end
 end)
 
--- Auto Grab
 task.spawn(function()
     while task.wait() do
         if CONFIG.AutoGrabEnabled and GrabRF then pcall(function() GrabRF:InvokeServer() end) else task.wait(0.01) end
     end
 end)
 
--- Inf Jump
 UserInputService.JumpRequest:Connect(function()
     if not CONFIG.InfJumpEnabled or not player.Character then return end
     local h=player.Character:FindFirstChildOfClass("Humanoid") if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
 end)
 
--- TP Walk
 RunService.Heartbeat:Connect(function(dt)
     if not CONFIG.TpWalkEnabled or not player.Character then return end
     local hrp=player.Character:FindFirstChild("HumanoidRootPart") local h=player.Character:FindFirstChildOfClass("Humanoid")
@@ -690,7 +740,6 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- Spam Notify
 task.spawn(function()
     while task.wait() do
         if CONFIG.SpamNotifyEnabled and RequestPrompt then
@@ -703,9 +752,6 @@ task.spawn(function()
     end
 end)
 
--- ============================================
--- BOT CONFIG
--- ============================================
 local BOT_CONFIG={SelectedUser=nil,GiveCommandsEnabled=false,IsKilling=false,KillTarget=nil}
 
 local function onPlayerChatted(sn,msg)
@@ -731,7 +777,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Emote Lock + Auto Carry
 RunService.Heartbeat:Connect(function()
     if not player.Character then return end
     local h=player.Character:FindFirstChildOfClass("Humanoid") local an=h and h:FindFirstChildOfClass("Animator")
@@ -760,7 +805,6 @@ if DeclineRequest then
     RunService.Heartbeat:Connect(function() if CONFIG.AutoDeclineEnabled then for i=1,5 do pcall(function() DeclineRequest:FireServer() StopCarry:FireServer() if TogglePrompts then TogglePrompts:FireServer(false) end end) end end end)
 end
 
--- Announce / Detention
 local function sendAnnouncement(t) if not AnnouncementRequest or t=="" then return end pcall(function() AnnouncementRequest:FireServer(t) end) end
 local function sendDetention(t) if not DetentionRequest then return end pcall(function() DetentionRequest:FireServer(t,"Breaking Rules") end) end
 task.spawn(function() while task.wait(0.1) do if CONFIG.DetentionLooping then for _,p in ipairs(Players:GetPlayers()) do if p~=player then sendDetention(p) end end end end end)
@@ -1061,6 +1105,24 @@ end)
 createInput(tabPanels[1], "Whitelist", "space separated", CONFIG.SafeList, function(txt) CONFIG.SafeList = txt end)
 createInput(tabPanels[1], "Grab TP Delay", "default 0.2", tostring(CONFIG.antiGrabDelay), function(txt)
     local v = tonumber(txt); if v then CONFIG.antiGrabDelay = v end
+end)
+
+createSection(tabPanels[1], "Repel Shield")
+createToggle(tabPanels[1], "Repel Shield", CONFIG.ShieldEnabled, function(s) 
+    CONFIG.ShieldEnabled = s 
+    if not s then
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local box = hrp:FindFirstChild("RepelShieldBox")
+            if box then box:Destroy() end
+        end
+    end
+end)
+createInput(tabPanels[1], "Box Size", "Studs", tostring(CONFIG.ShieldSize), function(txt) 
+    local v = tonumber(txt); if v and v > 1 then CONFIG.ShieldSize = v end 
+end)
+createInput(tabPanels[1], "Push Distance", "Studs", tostring(CONFIG.ShieldPushDistance), function(txt) 
+    local v = tonumber(txt); if v and v >= 0 then CONFIG.ShieldPushDistance = v end 
 end)
 
 -- ============================================
