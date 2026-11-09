@@ -1,4 +1,4 @@
- local Players = game:GetService("Players")
+local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,18 +43,18 @@ local CONFIG = {
     EmoteLock=false, SavedEmoteID="", CurrentEmoteTrack=nil, AnnounceText="Announce Here", DetentionLooping=false,
     AntiHitEnabled=false, AntiGrabEnabled=false, AntiGrabCooldown=false,
     AntiHit15Enabled=false, AntiHit15Cooldown=false, CombatBreakerEnabled=false,
-    SafeList="", Cooldown=false, LastHealth=100,
+    Cooldown=false, LastHealth=100,
     AntiRagEnabled=false, AntiGrabRagEnabled=false,
     AutoBlockEnabled=false, AutoBlockConn=nil,
     FastEmoteEnabled=false, FastEmoteTrack=nil, FastEmoteID="rbxassetid://134769837801223", NoSlowEnabled=false,
-    KillAuraEnabled=false, KillAuraCPS=2431, KillAuraRange=15, KillAuraTargetList="", KillAuraSafeList="",
+    KillAuraEnabled=false, KillAuraCPS=2431, KillAuraRange=15,
     KillAuraVisibility=0.5, KillAuraHitboxSize=28,
     InfJumpEnabled=false, JumpPower=50, TpWalkEnabled=false, TpWalkSpeed=50, TpWalkAnim=nil,
-    AutoDeclineEnabled=false, AutoAcceptCarry=false, AutoAcceptWhitelist="", AutoAcceptBlacklist="",
+    AutoDeclineEnabled=false, AutoAcceptCarry=false, 
     AutoGrabEnabled=false,
     DeathTpEnabled=false, LastDeathPos=nil,
     SpamNotifyEnabled=false, SpamNotifyMessage="default",
-    HitboxEnabled=false, HitboxSize=28, HitboxVisibility=0.5, HitboxTargetList="",
+    HitboxEnabled=false, HitboxSize=28, HitboxVisibility=0.5,
     antiGrabDelay = 0.2,
     -- VOID & BRING CONFIG
     BringTargetName="",
@@ -67,6 +67,9 @@ local CONFIG = {
     ShieldEnabled = false,
     ShieldSize = 15,
     ShieldPushDistance = 4,
+    -- GLOBAL LISTS
+    GlobalWhitelist = "",
+    GlobalBlacklist = ""
 }
 local kaClickInterval = 1 / CONFIG.KillAuraCPS
 
@@ -123,12 +126,29 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================
--- HELPERS
+-- GLOBAL HELPERS
 -- ============================================
-local function parseList(str) local t={} if str=="" then return t end for w in str:gmatch("%S+") do table.insert(t,w:lower()) end return t end
-local function isTarget(n, list) if #list==0 then return true end local ln=n:lower() for _,v in ipairs(list) do if ln:find(v,1,true) then return true end end return false end
-local function isSafe(n, list) local ln=n:lower() for _,v in ipairs(list) do if ln:find(v,1,true) then return true end end return false end
-local function isSafePlayer(plr) if not plr or CONFIG.SafeList=="" then return false end for w in string.gmatch(CONFIG.SafeList,"%S+") do if string.lower(w)==string.lower(plr.Name) or string.lower(w)==string.lower(plr.DisplayName) then return true end end return false end
+local function isNameInList(plr, listStr)
+    if not plr or listStr == "" then return false end
+    local name = string.lower(plr.Name)
+    local disp = string.lower(plr.DisplayName)
+    local search = string.lower(listStr)
+    
+    for word in string.gmatch(search, "[^,%s]+") do
+        if word == name or word == disp or string.find(name, word, 1, true) or string.find(disp, word, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function isSafePlayer(plr)
+    return isNameInList(plr, CONFIG.GlobalWhitelist)
+end
+
+local function isBlacklisted(plr)
+    return isNameInList(plr, CONFIG.GlobalBlacklist)
+end
 
 local function ResetAllHitboxes()
     for _, p in ipairs(Players:GetPlayers()) do
@@ -288,7 +308,6 @@ RunService.Heartbeat:Connect(function()
             local tHum = p.Character:FindFirstChildOfClass("Humanoid")
             
             if tHRP and tHum and tHum.Health > 0 then
-                -- WHITELIST CHECK: If their name is in the Defense tab whitelist, skip them!
                 if not isSafePlayer(p) then
                     local dist = (tHRP.Position - hrp.Position).Magnitude
                     
@@ -620,15 +639,16 @@ end
 task.spawn(function()
     while task.wait() do
         if CONFIG.KillAuraEnabled then
-            local tl=parseList(CONFIG.KillAuraTargetList) local sl=parseList(CONFIG.KillAuraSafeList)
             local myChar=player.Character local myHRP=myChar and myChar:FindFirstChild("HumanoidRootPart")
             local ct=nil cd=CONFIG.KillAuraRange
             if myHRP then for _,p in ipairs(Players:GetPlayers()) do
                 if p~=player and p.Character then
                     local hrp=p.Character:FindFirstChild("HumanoidRootPart") local h=p.Character:FindFirstChildOfClass("Humanoid")
                     if hrp and h and h.Health>0 then
-                        local wl=isSafe(p.Name,sl) or isSafe(p.DisplayName,sl) local it=isTarget(p.Name,tl) or isTarget(p.DisplayName,tl)
-                        if not wl and it then local d=(hrp.Position-myHRP.Position).Magnitude if d<=cd then cd=d ct=p end end
+                        if not isSafePlayer(p) then 
+                            local d=(hrp.Position-myHRP.Position).Magnitude 
+                            if d<=cd then cd=d ct=p end 
+                        end
                     end
                 end
             end end
@@ -653,8 +673,6 @@ end)
 task.spawn(function()
     while task.wait() do
         if CONFIG.HitboxEnabled then
-            local tl=parseList(CONFIG.HitboxTargetList) 
-            local sl=parseList(CONFIG.KillAuraSafeList)
             local myChar=player.Character 
             local myHRP=myChar and myChar:FindFirstChild("HumanoidRootPart")
             local ct=nil 
@@ -666,10 +684,7 @@ task.spawn(function()
                         local hrp=p.Character:FindFirstChild("HumanoidRootPart") 
                         local h=p.Character:FindFirstChildOfClass("Humanoid")
                         if hrp and h and h.Health>0 then
-                            local wl=isSafe(p.Name,sl) or isSafe(p.DisplayName,sl) 
-                            local it=isTarget(p.Name,tl) or isTarget(p.DisplayName,tl)
-                            
-                            if not wl and it then 
+                            if not isSafePlayer(p) then 
                                 local d=(hrp.Position-myHRP.Position).Magnitude 
                                 if #tl==0 then 
                                     ct=p 
@@ -688,12 +703,9 @@ task.spawn(function()
                     if hrp then
                         local om=hrp:FindFirstChild("KillAuraSphere") if om then om:Destroy() end
                         local shouldExpand = false
-                        if #tl == 0 then
-                            local wl=isSafe(p.Name,sl) or isSafe(p.DisplayName,sl) 
-                            local it=isTarget(p.Name,tl) or isTarget(p.DisplayName,tl)
-                            if not wl and it then shouldExpand = true end
-                        else
-                            if p == ct then shouldExpand = true end
+                        
+                        if not isSafePlayer(p) then
+                            shouldExpand = true 
                         end
 
                         if shouldExpand then
@@ -793,29 +805,16 @@ RunService.Heartbeat:Connect(function()
         end
     elseif not CONFIG.EmoteLock and CONFIG.CurrentEmoteTrack then CONFIG.CurrentEmoteTrack:Stop() CONFIG.CurrentEmoteTrack=nil end
     
-    -- FIXED FREEZE LOGIC
+    -- FIXED FREEZE LOGIC (Uses Global Lists)
     if CONFIG.AutoAcceptCarry and CarryRequest then
-        local wl = string.lower(CONFIG.AutoAcceptWhitelist)
-        local bl = string.lower(CONFIG.AutoAcceptBlacklist)
-        
         for _,p in ipairs(Players:GetPlayers()) do
             if p ~= player then
-                local name = string.lower(p.Name)
-                local disp = string.lower(p.DisplayName)
+                local isBlacklisted = isNameInList(p, CONFIG.GlobalBlacklist)
+                local isWhitelisted = isNameInList(p, CONFIG.GlobalWhitelist)
                 
-                -- Check if they are blacklisted
-                local isBlacklisted = (bl ~= "" and (string.find(bl, name, 1, true) or string.find(bl, disp, 1, true)))
-                
-                -- Check if they are whitelisted
-                local isWhitelisted = (wl ~= "" and (string.find(wl, name, 1, true) or string.find(wl, disp, 1, true)))
-                
-                -- If Whitelist is empty, freeze everyone (except blacklisted)
-                -- If Whitelist has names, ONLY freeze those names (unless they are blacklisted)
                 local shouldFreeze = false
                 if not isBlacklisted then
-                    if wl == "" then
-                        shouldFreeze = true
-                    elseif isWhitelisted then
+                    if CONFIG.GlobalWhitelist == "" or isWhitelisted then
                         shouldFreeze = true
                     end
                 end
@@ -939,7 +938,8 @@ end)
 
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
-local tabs = {"Defense", "Combat", "Hitbox", "Visuals", "Movement", "FREEZE", "Bot"}
+-- ADDED LISTS TAB
+local tabs = {"Lists", "Defense", "Combat", "Hitbox", "Visuals", "Movement", "FREEZE", "Bot"}
 local tabButtons = {}
 local tabPanels = {}
 
@@ -1119,24 +1119,39 @@ local function createLabel(parent, text, color)
 end
 
 -- ============================================
+-- LISTS TAB (Whitelist & Blacklist)
+-- ============================================
+createSection(tabPanels[1], "Global Whitelist")
+createLabel(tabPanels[1], "Anyone here is SAFE. (Comma or space separated)", Color3.fromRGB(100, 200, 100))
+createInput(tabPanels[1], "Whitelist", "names...", CONFIG.GlobalWhitelist, function(txt) 
+    CONFIG.GlobalWhitelist = txt 
+end)
+
+createSection(tabPanels[1], "Global Blacklist")
+createLabel(tabPanels[1], "Anyone here is BLOCKED from Freeze. (Comma or space separated)", Color3.fromRGB(200, 100, 100))
+createInput(tabPanels[1], "Blacklist", "names...", CONFIG.GlobalBlacklist, function(txt) 
+    CONFIG.GlobalBlacklist = txt 
+end)
+
+
+-- ============================================
 -- DEFENSE TAB
 -- ============================================
-createSection(tabPanels[1], "Defense")
-createToggle(tabPanels[1], "Anti-Hit (TP Player That Hit You)", CONFIG.AntiHitEnabled, function(s) CONFIG.AntiHitEnabled = s end)
-createToggle(tabPanels[1], "Anti-Hit ", CONFIG.AntiHit15Enabled, function(s) CONFIG.AntiHit15Enabled = s end)
-createToggle(tabPanels[1], "Anti-Grab", CONFIG.AntiGrabEnabled, function(s) CONFIG.AntiGrabEnabled = s end)
-createToggle(tabPanels[1], "Auto Block", CONFIG.AutoBlockEnabled, function(s) setAutoBlock(s) end)
-createToggle(tabPanels[1], "Anti-Ragdoll ", CONFIG.AntiRagEnabled, function(s)
+createSection(tabPanels[2], "Defense")
+createToggle(tabPanels[2], "Anti-Hit (TP Player That Hit You)", CONFIG.AntiHitEnabled, function(s) CONFIG.AntiHitEnabled = s end)
+createToggle(tabPanels[2], "Anti-Hit ", CONFIG.AntiHit15Enabled, function(s) CONFIG.AntiHit15Enabled = s end)
+createToggle(tabPanels[2], "Anti-Grab", CONFIG.AntiGrabEnabled, function(s) CONFIG.AntiGrabEnabled = s end)
+createToggle(tabPanels[2], "Auto Block", CONFIG.AutoBlockEnabled, function(s) setAutoBlock(s) end)
+createToggle(tabPanels[2], "Anti-Ragdoll ", CONFIG.AntiRagEnabled, function(s)
     CONFIG.AntiRagEnabled = s
     if s then startARC() else stopARC() end
 end)
-createInput(tabPanels[1], "Whitelist", "space separated", CONFIG.SafeList, function(txt) CONFIG.SafeList = txt end)
-createInput(tabPanels[1], "Grab TP Delay", "default 0.2", tostring(CONFIG.antiGrabDelay), function(txt)
+createInput(tabPanels[2], "Grab TP Delay", "default 0.2", tostring(CONFIG.antiGrabDelay), function(txt)
     local v = tonumber(txt); if v then CONFIG.antiGrabDelay = v end
 end)
 
--- Repel Shield (Integrated into Defense)
-createToggle(tabPanels[1], "Repel Shield", CONFIG.ShieldEnabled, function(s) 
+createSection(tabPanels[2], "Repel Shield")
+createToggle(tabPanels[2], "Repel Shield", CONFIG.ShieldEnabled, function(s) 
     CONFIG.ShieldEnabled = s 
     if not s then
         local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -1146,36 +1161,34 @@ createToggle(tabPanels[1], "Repel Shield", CONFIG.ShieldEnabled, function(s)
         end
     end
 end)
-createInput(tabPanels[1], "Box Size", "Studs", tostring(CONFIG.ShieldSize), function(txt) 
+createInput(tabPanels[2], "Box Size", "Studs", tostring(CONFIG.ShieldSize), function(txt) 
     local v = tonumber(txt); if v and v > 1 then CONFIG.ShieldSize = v end 
 end)
-createInput(tabPanels[1], "Push Distance", "Studs", tostring(CONFIG.ShieldPushDistance), function(txt) 
+createInput(tabPanels[2], "Push Distance", "Studs", tostring(CONFIG.ShieldPushDistance), function(txt) 
     local v = tonumber(txt); if v and v >= 0 then CONFIG.ShieldPushDistance = v end 
 end)
 
 -- ============================================
 -- COMBAT TAB
 -- ============================================
-createSection(tabPanels[2], "Kill Aura")
-createToggle(tabPanels[2], "Kill Aura", CONFIG.KillAuraEnabled, function(s) 
+createSection(tabPanels[3], "Kill Aura")
+createToggle(tabPanels[3], "Kill Aura", CONFIG.KillAuraEnabled, function(s) 
     CONFIG.KillAuraEnabled = s 
     if not s then ResetAllHitboxes() end
 end)
-createInput(tabPanels[2], "Targets", "blank = all", CONFIG.KillAuraTargetList, function(txt) CONFIG.KillAuraTargetList = txt end)
-createInput(tabPanels[2], "Safe List", "space separated", CONFIG.KillAuraSafeList, function(txt) CONFIG.KillAuraSafeList = txt end)
-createInput(tabPanels[2], "Visibility", "0-1", tostring(CONFIG.KillAuraVisibility), function(txt)
+createInput(tabPanels[3], "Visibility", "0-1", tostring(CONFIG.KillAuraVisibility), function(txt)
     local v = tonumber(txt); if v and v >= 0 and v <= 1 then CONFIG.KillAuraVisibility = v end
 end)
 
 -- VOID & BRING SECTION
-createSection(tabPanels[2], "Void / Bring")
-createInput(tabPanels[2], "Target Name", "player name", "", function(txt) CONFIG.BringTargetName = txt end)
+createSection(tabPanels[3], "Void / Bring")
+createInput(tabPanels[3], "Target Name", "player name", "", function(txt) CONFIG.BringTargetName = txt end)
 
-createInput(tabPanels[2], "Void X", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymLength = v end end)
-createInput(tabPanels[2], "Void Y", "default 300", "300", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymHeight = v end end)
-createInput(tabPanels[2], "Void Z", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymDistance = v end end)
+createInput(tabPanels[3], "Void X", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymLength = v end end)
+createInput(tabPanels[3], "Void Y", "default 300", "300", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymHeight = v end end)
+createInput(tabPanels[3], "Void Z", "default 0", "0", function(txt) local v = tonumber(txt); if v then CONFIG.InstaGymDistance = v end end)
 
-createButton(tabPanels[2], "🌀 VOID 🌀", function()
+createButton(tabPanels[3], "🌀 VOID 🌀", function()
     local txt = CONFIG.BringTargetName:lower()
     if txt == "" then return end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -1186,7 +1199,7 @@ createButton(tabPanels[2], "🌀 VOID 🌀", function()
     end
 end, Color3.fromRGB(255, 150, 50))
 
-createButton(tabPanels[2], " BRING ", function()
+createButton(tabPanels[3], " BRING ", function()
     local txt = CONFIG.BringTargetName:lower()
     if txt == "" then return end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -1198,63 +1211,62 @@ createButton(tabPanels[2], " BRING ", function()
 end, Color3.fromRGB(80, 200, 100))
 
 
-createSection(tabPanels[2], "Combat")
-createToggle(tabPanels[2], "Semi-God Mode", CONFIG.CombatBreakerEnabled, function(s) CONFIG.CombatBreakerEnabled = s end)
-createToggle(tabPanels[2], "Semi-God Mode Movement", CONFIG.FastEmoteEnabled, function(s) CONFIG.FastEmoteEnabled = s end)
-createToggle(tabPanels[2], "No Slow", CONFIG.NoSlowEnabled, function(s) CONFIG.NoSlowEnabled = s end)
-createToggle(tabPanels[2], "Auto Grab", CONFIG.AutoGrabEnabled, function(s) CONFIG.AutoGrabEnabled = s end)
-createToggle(tabPanels[2], "Death TP", CONFIG.DeathTpEnabled, function(s)
+createSection(tabPanels[3], "Combat")
+createToggle(tabPanels[3], "Semi-God Mode", CONFIG.CombatBreakerEnabled, function(s) CONFIG.CombatBreakerEnabled = s end)
+createToggle(tabPanels[3], "Semi-God Mode Movement", CONFIG.FastEmoteEnabled, function(s) CONFIG.FastEmoteEnabled = s end)
+createToggle(tabPanels[3], "No Slow", CONFIG.NoSlowEnabled, function(s) CONFIG.NoSlowEnabled = s end)
+createToggle(tabPanels[3], "Auto Grab", CONFIG.AutoGrabEnabled, function(s) CONFIG.AutoGrabEnabled = s end)
+createToggle(tabPanels[3], "Death TP", CONFIG.DeathTpEnabled, function(s)
     CONFIG.DeathTpEnabled = s
     if not s then CONFIG.LastDeathPos = nil end
 end)
-createToggle(tabPanels[2], "No Anim (Hide Punches/Kicks)", CONFIG.NoAnimEnabled, function(s) CONFIG.NoAnimEnabled = s end)
+createToggle(tabPanels[3], "No Anim (Hide Punches/Kicks)", CONFIG.NoAnimEnabled, function(s) CONFIG.NoAnimEnabled = s end)
 
 -- ============================================
 -- HITBOX TAB
 -- ============================================
-createSection(tabPanels[3], "Hitbox Expander")
-createToggle(tabPanels[3], "Hitbox Expander", CONFIG.HitboxEnabled, function(s) 
+createSection(tabPanels[4], "Hitbox Expander")
+createToggle(tabPanels[4], "Hitbox Expander", CONFIG.HitboxEnabled, function(s) 
     CONFIG.HitboxEnabled = s 
     if not s then ResetAllHitboxes() end
 end)
-createInput(tabPanels[3], "Target List", "blank = all", CONFIG.HitboxTargetList, function(txt) CONFIG.HitboxTargetList = txt end)
-createInput(tabPanels[3], "Hitbox Size", "1-150", tostring(CONFIG.HitboxSize), function(txt)
+createInput(tabPanels[4], "Hitbox Size", "1-150", tostring(CONFIG.HitboxSize), function(txt)
     local v = tonumber(txt); if v and v >= 1 and v <= 150 then CONFIG.HitboxSize = math.floor(v) end
 end)
-createInput(tabPanels[3], "Hitbox Visibility", "0-1", tostring(CONFIG.HitboxVisibility), function(txt)
+createInput(tabPanels[4], "Hitbox Visibility", "0-1", tostring(CONFIG.HitboxVisibility), function(txt)
     local v = tonumber(txt); if v and v >= 0 and v <= 1 then CONFIG.HitboxVisibility = v end
 end)
 
 -- ============================================
 -- VISUALS TAB
 -- ============================================
-createSection(tabPanels[4], "Emote")
-createToggle(tabPanels[4], "Emote Lock", CONFIG.EmoteLock, function(s) CONFIG.EmoteLock = s end)
+createSection(tabPanels[5], "Emote")
+createToggle(tabPanels[5], "Emote Lock", CONFIG.EmoteLock, function(s) CONFIG.EmoteLock = s end)
 
-createSection(tabPanels[4], "Pet")
-createInput(tabPanels[4], "Pet Text", "", CONFIG.PetCustomText, function(txt) CONFIG.PetCustomText = txt end)
-createToggle(tabPanels[4], "Pet Animator", CONFIG.PetSpamEnabled, function(s)
+createSection(tabPanels[5], "Pet")
+createInput(tabPanels[5], "Pet Text", "", CONFIG.PetCustomText, function(txt) CONFIG.PetCustomText = txt end)
+createToggle(tabPanels[5], "Pet Animator", CONFIG.PetSpamEnabled, function(s)
     CONFIG.PetSpamEnabled = s
     if s then CONFIG.TargetPet = findMyPet() end
 end)
 
-createSection(tabPanels[4], "Announcement")
-createInput(tabPanels[4], "Announce Here", "", CONFIG.AnnounceText, function(txt) CONFIG.AnnounceText = txt end)
-createButton(tabPanels[4], "SEND ANNOUNCEMENT", function() sendAnnouncement(CONFIG.AnnounceText) end, Color3.fromRGB(50, 150, 255))
+createSection(tabPanels[5], "Announcement")
+createInput(tabPanels[5], "Announce Here", "", CONFIG.AnnounceText, function(txt) CONFIG.AnnounceText = txt end)
+createButton(tabPanels[5], "SEND ANNOUNCEMENT", function() sendAnnouncement(CONFIG.AnnounceText) end, Color3.fromRGB(50, 150, 255))
 
-createSection(tabPanels[4], "Detention")
-createToggle(tabPanels[4], "", CONFIG.DetentionLooping, function(s) CONFIG.DetentionLooping = s end)
+createSection(tabPanels[5], "Detention")
+createToggle(tabPanels[5], "", CONFIG.DetentionLooping, function(s) CONFIG.DetentionLooping = s end)
 
-createSection(tabPanels[4], "Spam Notify")
-createToggle(tabPanels[4], "Spam Notify", CONFIG.SpamNotifyEnabled, function(s) CONFIG.SpamNotifyEnabled = s end)
-createInput(tabPanels[4], "Message", "default", CONFIG.SpamNotifyMessage, function(txt) CONFIG.SpamNotifyMessage = txt end)
+createSection(tabPanels[5], "Spam Notify")
+createToggle(tabPanels[5], "Spam Notify", CONFIG.SpamNotifyEnabled, function(s) CONFIG.SpamNotifyEnabled = s end)
+createInput(tabPanels[5], "Message", "default", CONFIG.SpamNotifyMessage, function(txt) CONFIG.SpamNotifyMessage = txt end)
 
 -- ============================================
 -- MOVEMENT TAB
 -- ============================================
-createSection(tabPanels[5], "Jump")
-createToggle(tabPanels[5], "Infinite Jump", CONFIG.InfJumpEnabled, function(s) CONFIG.InfJumpEnabled = s end)
-createInput(tabPanels[5], "Jump Power", "1-200", tostring(CONFIG.JumpPower), function(txt)
+createSection(tabPanels[6], "Jump")
+createToggle(tabPanels[6], "Infinite Jump", CONFIG.InfJumpEnabled, function(s) CONFIG.InfJumpEnabled = s end)
+createInput(tabPanels[6], "Jump Power", "1-200", tostring(CONFIG.JumpPower), function(txt)
     local v = tonumber(txt)
     if v and v >= 1 and v <= 200 then
         CONFIG.JumpPower = v
@@ -1265,9 +1277,9 @@ createInput(tabPanels[5], "Jump Power", "1-200", tostring(CONFIG.JumpPower), fun
     end
 end)
 
-createSection(tabPanels[5], "TP Walk")
-createToggle(tabPanels[5], "TP Walk", CONFIG.TpWalkEnabled, function(s) CONFIG.TpWalkEnabled = s end)
-createInput(tabPanels[5], "TP Walk Speed", "1-300", tostring(CONFIG.TpWalkSpeed), function(txt)
+createSection(tabPanels[6], "TP Walk")
+createToggle(tabPanels[6], "TP Walk", CONFIG.TpWalkEnabled, function(s) CONFIG.TpWalkEnabled = s end)
+createInput(tabPanels[6], "TP Walk Speed", "1-300", tostring(CONFIG.TpWalkSpeed), function(txt)
     local v = tonumber(txt)
     if v and v >= 1 and v <= 300 then CONFIG.TpWalkSpeed = v end
 end)
@@ -1275,18 +1287,16 @@ end)
 -- ============================================
 -- FREEZE TAB
 -- ============================================
-createSection(tabPanels[6], "Carry")
-createToggle(tabPanels[6], "ANTI FREEZE", CONFIG.AutoDeclineEnabled, function(s) CONFIG.AutoDeclineEnabled = s end)
-createToggle(tabPanels[6], "FREEZE", CONFIG.AutoAcceptCarry, function(s) CONFIG.AutoAcceptCarry = s end)
-createInput(tabPanels[6], "FREEZE Whitelist", "leave blank = all", CONFIG.AutoAcceptWhitelist, function(txt) CONFIG.AutoAcceptWhitelist = txt end)
-createInput(tabPanels[6], "FREEZE Blacklist", "space separated", CONFIG.AutoAcceptBlacklist, function(txt) CONFIG.AutoAcceptBlacklist = txt end)
-createLabel(tabPanels[6], "🚫 Blacklisted players will be rejected", Color3.fromRGB(231, 76, 60))
+createSection(tabPanels[7], "Carry")
+createToggle(tabPanels[7], "ANTI FREEZE", CONFIG.AutoDeclineEnabled, function(s) CONFIG.AutoDeclineEnabled = s end)
+createToggle(tabPanels[7], "FREEZE", CONFIG.AutoAcceptCarry, function(s) CONFIG.AutoAcceptCarry = s end)
+createLabel(tabPanels[7], "Global Lists control who gets frozen.", Color3.fromRGB(150, 150, 170))
 
 -- ============================================
 -- BOT TAB
 -- ============================================
-createSection(tabPanels[7], "Bot Commands")
-createButton(tabPanels[7], "USE IF U HAVE A ALT", function()
+createSection(tabPanels[8], "Bot Commands")
+createButton(tabPanels[8], "USE IF U HAVE A ALT", function()
     if _G._botGui and _G._botGui.Parent then _G._botGui:Destroy() end
     local sg = Instance.new("ScreenGui")
     sg.Name = "CommandConsoleGUI" sg.ResetOnSpawn = false sg.Parent = CoreGui
@@ -1380,9 +1390,9 @@ createButton(tabPanels[7], "USE IF U HAVE A ALT", function()
     Instance.new("UICorner", info).CornerRadius = UDim.new(0, 6)
 end, Color3.fromRGB(255, 100, 50))
 
-createSection(tabPanels[7], "Commands")
-createLabel(tabPanels[7], ".kill [name] — kill target", Color3.fromRGB(180, 180, 220))
-createLabel(tabPanels[7], ".stop — stop killing", Color3.fromRGB(180, 180, 220))
+createSection(tabPanels[8], "Commands")
+createLabel(tabPanels[8], ".kill [name] — kill target", Color3.fromRGB(180, 180, 220))
+createLabel(tabPanels[8], ".stop — stop killing", Color3.fromRGB(180, 180, 220))
 
 -- L to toggle
 UserInputService.InputBegan:Connect(function(input, gp)
