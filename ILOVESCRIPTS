@@ -880,7 +880,7 @@ local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -70, 1, 0)
 titleText.Position = UDim2.new(0, 8, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "⚡ PAZ HUB"
+titleText.Text = "TFK HUB"
 titleText.TextColor3 = Color3.fromRGB(0, 0, 0)
 titleText.TextSize = 12
 titleText.Font = Enum.Font.GothamBold
@@ -932,7 +932,7 @@ end)
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
 -- ADDED LISTS TAB
-local tabs = {"Lists", "Defense", "Combat", "Hitbox", "Visuals", "Movement", "FREEZE", "Bot"}
+local tabs = {"Whitelist/Black", "Defense", "Combat", "Hitbox", "Visuals", "Movement", "FREEZE", "Bot"}
 local tabButtons = {}
 local tabPanels = {}
 
@@ -1114,14 +1114,14 @@ end
 -- ============================================
 -- LISTS TAB (Whitelist & Blacklist)
 -- ============================================
-createSection(tabPanels[1], "Global Whitelist")
-createLabel(tabPanels[1], "Anyone here is SAFE. (Comma or space separated)", Color3.fromRGB(100, 200, 100))
+createSection(tabPanels[1], "Whitelist")
+createLabel(tabPanels[1], "", Color3.fromRGB(100, 200, 100))
 createInput(tabPanels[1], "Whitelist", "names...", CONFIG.GlobalWhitelist, function(txt) 
     CONFIG.GlobalWhitelist = txt 
 end)
 
-createSection(tabPanels[1], "Global Blacklist")
-createLabel(tabPanels[1], "Anyone here is BLOCKED from Freeze. (Comma or space separated)", Color3.fromRGB(200, 100, 100))
+createSection(tabPanels[1], "Blacklist")
+createLabel(tabPanels[1], "", Color3.fromRGB(200, 100, 100))
 createInput(tabPanels[1], "Blacklist", "names...", CONFIG.GlobalBlacklist, function(txt) 
     CONFIG.GlobalBlacklist = txt 
 end)
@@ -1142,8 +1142,8 @@ createInput(tabPanels[2], "Grab TP Delay", "default 0.2", tostring(CONFIG.antiGr
     local v = tonumber(txt); if v then CONFIG.antiGrabDelay = v end
 end)
 
-createSection(tabPanels[2], "Repel Shield")
-createToggle(tabPanels[2], "Repel Shield", CONFIG.ShieldEnabled, function(s) 
+createSection(tabPanels[2], "Best Anti Hit")
+createToggle(tabPanels[2], "Anti Hit V2", CONFIG.ShieldEnabled, function(s) 
     CONFIG.ShieldEnabled = s 
     if not s then
         local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -1212,7 +1212,7 @@ createToggle(tabPanels[3], "Death TP", CONFIG.DeathTpEnabled, function(s)
     CONFIG.DeathTpEnabled = s
     if not s then CONFIG.LastDeathPos = nil end
 end)
-createToggle(tabPanels[3], "No Anim (Hide Punches/Kicks)", CONFIG.NoAnimEnabled, function(s) CONFIG.NoAnimEnabled = s end)
+createToggle(tabPanels[3], "No Hit Anims", CONFIG.NoAnimEnabled, function(s) CONFIG.NoAnimEnabled = s end)
 
 -- ============================================
 -- HITBOX TAB
@@ -1282,7 +1282,7 @@ end)
 createSection(tabPanels[7], "Carry")
 createToggle(tabPanels[7], "ANTI FREEZE", CONFIG.AutoDeclineEnabled, function(s) CONFIG.AutoDeclineEnabled = s end)
 createToggle(tabPanels[7], "FREEZE", CONFIG.AutoAcceptCarry, function(s) CONFIG.AutoAcceptCarry = s end)
-createLabel(tabPanels[7], "Global Lists control who gets frozen.", Color3.fromRGB(150, 150, 170))
+createLabel(tabPanels[7], "Whitelist control who gets frozen.", Color3.fromRGB(150, 150, 170))
 
 -- ============================================
 -- BOT TAB
@@ -1453,6 +1453,10 @@ for _, player in ipairs(Players:GetPlayers()) do
         print("❌ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is NOT whitelisted. Kicking...")
         player:Kick("You are not whitelisted to use this script.")
     else
+        print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
+        whitelistedPlayers[player.UserId] = true
+    end
+end
         print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
         whitelistedPlayers[player.UserId] = true
     end
