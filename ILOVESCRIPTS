@@ -1457,7 +1457,3 @@ for _, player in ipairs(Players:GetPlayers()) do
         whitelistedPlayers[player.UserId] = true
     end
 end
-        print("✅ Player " .. player.Name .. " (ID: " .. player.UserId .. ") is whitelisted.")
-        whitelistedPlayers[player.UserId] = true
-    end
-end
