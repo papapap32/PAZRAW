@@ -352,7 +352,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ============================================
--- AUTO BLOCK
+-- AUTO BLOCK (exactly as provided)
 -- ============================================
 local function setAutoBlock(state)
     if not BlockRF then warn("[AutoBlock] Block remote not found") return end
@@ -727,6 +727,7 @@ task.spawn(function()
     end
 end)
 
+-- Auto Grab (exactly as provided)
 task.spawn(function()
     while task.wait() do
         if CONFIG.AutoGrabEnabled and GrabRF then pcall(function() GrabRF:InvokeServer() end) else task.wait(0.01) end
