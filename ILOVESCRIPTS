@@ -52,7 +52,6 @@ function sendToChat(p1)
   if not ok then warn("Failed to send chat message:", result) end
 end
 
-sendToChat("➡️ - Loading TFK Script | V6 - ⬅️")
 
 starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
 task.spawn(function()
@@ -667,15 +666,15 @@ tab2:CreateButton({
 })
 
 toxicMessages = {
-  "Pov: you try to fight a TFK user | tfkv6.5", "Work smarter not harder | tfkv6.5",
-  "You will never defeat me 🥀 | tfkv6.5", "Pov: you cant beat me | tfkv6.5",
-  "im not even trying and your still losing | tfkv6.5", "Pov: you use TFK scripts 👑",
+  "Pov: you try to fight a TFK user | tfkV8", "Work smarter not harder | TFKV8",
+  "You will never defeat me 🥀 | TFKV8", "Pov: you cant beat me | TFKV8",
+  "im not even trying and your still losing | TFKV8", "Pov: you use TFK scripts 👑",
 }
 toxicSpamActive = false
 toxicSpamThread = nil
 
 tab2:CreateToggle({
-  Name = "Auto Toxic Chat",
+  Name = "Toxic Chat",
   CurrentValue = false,
   Flag = "ToxicSpamToggle",
   Callback = function(value2)
@@ -752,7 +751,7 @@ function f6()
 end
 
 tab2:CreateToggle({
-  Name = "Emote Godmode (MID)",
+  Name = "Emote Godmode ",
   CurrentValue = false,
   Flag = "EmoteToggle",
   Callback = function(value3) f7() end,
@@ -833,7 +832,7 @@ tab2:CreateToggle({
 })
 
 tab2:CreateToggle({
-  Name = "Spam Stop Carry (MID)",
+  Name = "Spam Stop Carry ",
   CurrentValue = false,
   Flag = "StopCarryToggle",
   Callback = function(value7)
@@ -1451,48 +1450,77 @@ combatDefenseTab:CreateToggle({
   end,
 })
 
--- ═══════════════════════════════════════════════════════════════════
--- Game-System Switches
--- ═══════════════════════════════════════════════════════════════════
 combatDefenseTab:CreateSection("Game-System Switches")
 
-local antiGrabEnabled = v2t.antiGrabEnabled
-local antiGrabDelay = v2t.antiGrabDelay
+-- ═══════════════════════════════════════════════════════════════════
+-- ANTI GRAB (with Event Teleport to actually break the grab)
+-- ═══════════════════════════════════════════════════════════════════
+local antiGrabEnabled = false
+local antiGrabDelay = 0.2
+local antiGrabCooldown = false
 
-local function f9(instance5)
-  local waitForChild = instance5:WaitForChild("Humanoid", 10)
-  local waitForChild2 = instance5:WaitForChild("HumanoidRootPart", 10)
-  if not waitForChild or not waitForChild2 then return end
-  waitForChild:GetPropertyChangedSignal("PlatformStand"):Connect(function()
-    if not antiGrabEnabled then return end
-    local position
-    if waitForChild.PlatformStand then
-      position = waitForChild2.Position
-      task.delay(antiGrabDelay, function()
-        local humanoidRootPart4 = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart4 then humanoidRootPart4.CFrame = CFrame.new(position) end
-      end)
-    end
+local EventSystem = replicatedStorage:FindFirstChild("EventInviteSystem")
+local EventTeleportEvent = EventSystem and EventSystem:FindFirstChild("EventTeleportEvent")
+
+local function setupAntiGrab(character)
+  local hum = character:WaitForChild("Humanoid", 10)
+  local hrp = character:WaitForChild("HumanoidRootPart", 10)
+  if not hum or not hrp then return end
+
+  hum:GetPropertyChangedSignal("PlatformStand"):Connect(function()
+    if not antiGrabEnabled or antiGrabCooldown then return end
+    if not hum.PlatformStand then return end
+
+    antiGrabCooldown = true
+    local savedPos = hrp.Position
+    local savedCFrame = hrp.CFrame
+
+    -- Fire event teleport to force server to reset grabbed state
+    pcall(function()
+      if EventTeleportEvent then
+        EventTeleportEvent:FireServer()
+      end
+    end)
+
+    -- After delay, snap back to saved position
+    task.delay(antiGrabDelay, function()
+      local currentHrp = localPlayer.Character
+        and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+      if currentHrp then
+        pcall(function()
+          currentHrp.CFrame = savedCFrame
+          currentHrp.AssemblyLinearVelocity = Vector3.new(0, -1, 0)
+          currentHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        end)
+      end
+      antiGrabCooldown = false
+    end)
   end)
 end
 
-localPlayer.CharacterAdded:Connect(function(character3) task.spawn(f9, character3) end)
-if localPlayer.Character then task.spawn(f9, localPlayer.Character) end
+localPlayer.CharacterAdded:Connect(function(char) task.spawn(setupAntiGrab, char) end)
+if localPlayer.Character then task.spawn(setupAntiGrab, localPlayer.Character) end
 
 combatDefenseTab:CreateToggle({
   Name = "Anti Grab",
   CurrentValue = false,
-  Callback = function(value17)
-    antiGrabEnabled = value17
-    v2t.antiGrabEnabled = value17
-    f3t("Anti Grab", value17 and "Enabled." or "Disabled.", 4)
+  Callback = function(on)
+    antiGrabEnabled = on
+    result2:Notify({
+      Title = "Anti Grab",
+      Content = on and "Enabled (Event TP + Snap Back)" or "Disabled",
+      Duration = 3,
+    })
   end,
 })
 
 combatDefenseTab:CreateSlider({
   Name = "Anti Grab Delay",
-  Range = { 0, 2 }, Increment = 0.05, Suffix = " sec", CurrentValue = v2t.antiGrabDelay,
-  Callback = function(value18) v2t.antiGrabDelay = value18; antiGrabDelay = value18 end,
+  Range = { 0, 2 },
+  Increment = 0.05,
+  Suffix = " sec",
+  CurrentValue = 0.2,
+  Callback = function(v) antiGrabDelay = v end,
 })
 
 combatDefenseTab:CreateToggle({
@@ -3445,7 +3473,7 @@ result2:Notify({
   Image = 4579527842,
 })
 
-print("⚡ TFK HUB V3 loaded with Void/Bring + Force Field + AutoClicker↔PC Aura Sync.")
+print("TFK HUB V3 loaded.")
 -- ============================================
 -- SERVER-SIDE WHITELIST VALIDATION
 -- ============================================
@@ -3453,22 +3481,8 @@ local Players = game:GetService("Players")
 
 -- ADD YOUR PLAYER IDS HERE
 local WHITELIST = {
-    4579527842,  -- Replace with your ID
-    11661491942,  -- Add more IDs as needed
-    2355550306,
-    11654964319,
-    11406883952,
-    5345980190,
-    11712055073,
-    8928454839,
-    11406883952,
-    9947282709,
-    10420297855,
-    11787230669,
-    8321022288,
-    4584607255,
-    5688265637,
-    911269213,
+    4579527842,  -- PAZ
+    5345980190,  -- keem
 }
 local whitelistedPlayers = {}
 
