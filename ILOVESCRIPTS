@@ -3449,7 +3449,7 @@ task.defer(function()
     local textChannels = textChatService:FindFirstChild("TextChannels")
     local rbxGeneral = textChannels and textChannels:FindFirstChild("RBXGeneral")
     if rbxGeneral then
-      rbxGeneral:SendAsync("➡️- LOADING TFK HUB -⬅️")
+      rbxGeneral:SendAsync("➡️- LOADING TFK HUB/PAZYY -⬅️")
       flag12b = true
     end
   end)
