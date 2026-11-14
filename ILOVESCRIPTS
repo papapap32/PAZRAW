@@ -3699,6 +3699,8 @@ local Players = game:GetService("Players")
 local WHITELIST = {
     4579527842,  -- PAZ
     5345980190,  -- keem
+    11964954933, -- jem
+    4521138390,  --GHOST
 }
 local whitelistedPlayers = {}
 
