@@ -1,4 +1,180 @@
 --═══════════════════════════════════════════════════════════════════
+-- TFK HUB — WHITELIST GATE (User ID version)
+--═══════════════════════════════════════════════════════════════════
+
+local Players      = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer  = Players.LocalPlayer
+
+-- ⚠️ EDIT: add real USER IDs here (numbers, not names)
+local WHITELIST = {
+    4579527842,    -- PAZ
+    4521138390,    -- ← GHOST
+    11964954933,    -- ← JEM
+    5345980190,          KEEM
+}
+
+--🧪 TEST FLAGS
+local FORCE_DENY = false
+local SKIP_LOAD  = false
+
+local function isWhitelisted(player)
+    if FORCE_DENY then return false end
+    for _, allowedId in ipairs(WHITELIST) do
+        if player.UserId == allowedId then return true end
+    end
+    return false
+end
+
+local function makeCorner(inst, r)
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 8); c.Parent = inst; return c
+end
+
+--═══════════════════════════════════════════════════════════════════
+-- LOADING SCREEN
+--═══════════════════════════════════════════════════════════════════
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "TFK_LoadingGui"
+loadingGui.ResetOnSpawn = false
+loadingGui.IgnoreGuiInset = true
+loadingGui.DisplayOrder = 999
+loadingGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local loadBg = Instance.new("Frame")
+loadBg.Size = UDim2.new(1, 0, 1, 0)
+loadBg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+loadBg.BorderSizePixel = 0
+loadBg.Parent = loadingGui
+
+local loadTitle = Instance.new("TextLabel")
+loadTitle.Size = UDim2.new(1, 0, 0, 60)
+loadTitle.Position = UDim2.new(0, 0, 0.5, -50)
+loadTitle.BackgroundTransparency = 1
+loadTitle.Text = "LOADING TFK/PAZ SCRIPT..."
+loadTitle.TextColor3 = Color3.fromRGB(0, 255, 150)
+loadTitle.Font = Enum.Font.GothamBold
+loadTitle.TextScaled = true
+loadTitle.Parent = loadBg
+
+local barBg = Instance.new("Frame")
+barBg.Size = UDim2.new(0.4, 0, 0, 8)
+barBg.Position = UDim2.new(0.3, 0, 0.5, 20)
+barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+barBg.BorderSizePixel = 0
+barBg.Parent = loadBg
+makeCorner(barBg, 4)
+
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.new(0, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+barFill.BorderSizePixel = 0
+barFill.Parent = barBg
+makeCorner(barFill, 4)
+
+TweenService:Create(barFill, TweenInfo.new(SKIP_LOAD and 0.3 or 2.2, Enum.EasingStyle.Linear), {
+    Size = UDim2.new(1, 0, 1, 0)
+}):Play()
+
+task.wait(7)
+loadingGui:Destroy()
+
+--═══════════════════════════════════════════════════════════════════
+-- GATE: non-whitelisted users see the denied GUI and the script STOPS
+--═══════════════════════════════════════════════════════════════════
+if not isWhitelisted(LocalPlayer) then
+    local warnGui = Instance.new("ScreenGui")
+    warnGui.Name = "TFK_AccessDenied"
+    warnGui.ResetOnSpawn = false
+    warnGui.IgnoreGuiInset = true
+    warnGui.DisplayOrder = 999
+    warnGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+    bg.BackgroundTransparency = 0.3
+    bg.BorderSizePixel = 0
+    bg.Parent = warnGui
+
+    local main = Instance.new("Frame")
+    main.Size = UDim2.new(0, 520, 0, 260)
+    main.Position = UDim2.new(0.5, -260, 0.5, -130)
+    main.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
+    main.BorderSizePixel = 0
+    main.Parent = bg
+    makeCorner(main, 12)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 40, 40)
+    stroke.Thickness = 2
+    stroke.Parent = main
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -20, 0, 50)
+    title.Position = UDim2.new(0, 10, 0, 12)
+    title.BackgroundTransparency = 1
+    title.Text = "ACCESS DENIED"
+    title.TextColor3 = Color3.fromRGB(255, 50, 50)
+    title.Font = Enum.Font.GothamBlack
+    title.TextScaled = true
+    title.Parent = main
+
+    local msg = Instance.new("TextLabel")
+    msg.Size = UDim2.new(1, -40, 0, 90)
+    msg.Position = UDim2.new(0, 20, 0, 70)
+    msg.BackgroundTransparency = 1
+    msg.Text = "LMFAO ASK KEEM/PAZ/JEM TO BE WHITELISTED"
+    msg.TextColor3 = Color3.fromRGB(255, 255, 255)
+    msg.Font = Enum.Font.GothamBold
+    msg.TextScaled = true
+    msg.TextWrapped = true
+    msg.Parent = main
+
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(1, -40, 0, 28)
+    sub.Position = UDim2.new(0, 20, 0, 168)
+    sub.BackgroundTransparency = 1
+    sub.Text = "Your UserId: " .. LocalPlayer.UserId
+    sub.TextColor3 = Color3.fromRGB(180, 180, 180)
+    sub.Font = Enum.Font.Gotham
+    sub.TextScaled = true
+    sub.Parent = main
+
+    -- 🧪 Copy UserId button (handy for asking to be whitelisted)
+    local copyBtn = Instance.new("TextButton")
+    copyBtn.Size = UDim2.new(0, 200, 0, 34)
+    copyBtn.Position = UDim2.new(0.5, -100, 1, -52)
+    copyBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+    copyBtn.Text = "📋 Copy UserId"
+    copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    copyBtn.Font = Enum.Font.GothamBold
+    copyBtn.TextSize = 15
+    copyBtn.Parent = main
+    makeCorner(copyBtn, 6)
+
+    copyBtn.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard(tostring(LocalPlayer.UserId))
+            copyBtn.Text = "✅ Copied!"
+            task.delay(1.5, function()
+                if copyBtn.Parent then copyBtn.Text = "📋 Copy UserId" end
+            end)
+        end
+    end)
+
+    TweenService:Create(title,
+        TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+        { TextTransparency = 0.4 }):Play()
+
+    -- 🚨 STOP the rest of the script from running
+    return
+end
+
+--═══════════════════════════════════════════════════════════════════
+-- ✅ WHITELISTED — TFK HUB CONTINUES BELOW
+--═══════════════════════════════════════════════════════════════════
+print("[TFK/PAZ] Whitelist passed for " .. LocalPlayer.Name .. " (" .. LocalPlayer.UserId .. ") — loading hub...")
+--═══════════════════════════════════════════════════════════════════
 -- TFK HUB — Full Merge + Void/Bring + Force Field + Sync Autoclicker
 --═══════════════════════════════════════════════════════════════════
 
@@ -705,9 +881,9 @@ do -- PVP & Carry Spam Tab
   })
 
   toxicMessages = {
-    "Pov: you try to fight a TFK user | tfkV8", "Work smarter not harder | TFKV8",
-    "You will never defeat me 🥀 | TFKV8", "Pov: you cant beat me | TFKV8",
-    "im not even trying and your still losing | TFKV8", "Pov: you use TFK scripts 👑",
+    "Pov: I was literally playing with one hand there | TFKV3", "You are actually so ez it is funny | TFKV3",
+    "Oh my bad thought you was afk 🥀 | TFKV3", "Hold that L bro you are ez | TFKV3",
+    "im not even trying and your still losing | TFKv3", "Pov: you use TFK scripts 👑",
   }
   toxicSpamActive = false
   toxicSpamThread = nil
@@ -740,13 +916,13 @@ do -- PVP & Carry Spam Tab
   tab2:CreateButton({
     Name = "Open Selectable Carry Spam GUI",
     Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/girhubsccountv-hue/random-useless-stuff/refs/heads/main/mbmb"))()
+      loadstring(Game:HttpGet("https://raw.githubusercontent.com/papapap32/TFKCARRYSPAM/refs/heads/main/CARRY"))()
     end,
   })
   tab2:CreateButton({
     Name = "Open Pet Animator GUI",
     Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/girhubsccountv-hue/random-useless-stuff/refs/heads/main/basketball"))()
+      loadstring(Game:HttpGet("https://raw.githubusercontent.com/papapap32/PETANIMATOR/refs/heads/main/PET"))()
     end,
   })
   tab2:CreateButton({
@@ -1280,7 +1456,7 @@ do -- Combat & Defense Tab
   })
 
   autoClickerToggleRef = combatDefenseTab:CreateToggle({
-    Name = "AutoClicker (synced with PC Aura)",
+    Name = "AutoClicker",
     CurrentValue = false,
     Callback = function(value20)
       if value20 then
@@ -1329,83 +1505,204 @@ do -- Combat & Defense Tab
     end)
   end
 
-  combatDefenseTab:CreateSection("NPC Test Tools")
-  combatDefenseTab:CreateSlider({
-    Name = "Hitbox Aura Size",
-    Range = { 2, 28 }, Increment = 1, Suffix = " studs", CurrentValue = v2t.hitboxSize,
-    Callback = function(value12) v2t.hitboxSize = value12 end,
-  })
-  combatDefenseTab:CreateSlider({
-    Name = "Hitbox Aura Range",
-    Range = { 5, 100 }, Increment = 1, Suffix = " studs", CurrentValue = v2t.hitboxDistance,
-    Callback = function(value13) v2t.hitboxDistance = value13 end,
-  })
+combatDefenseTab:CreateSection("Hitbox")
 
   local localPlayer3 = players.LocalPlayer
   local hitboxAura = false
-  local seen = {}
+  local hitboxAuraThread = nil
+  local hitboxSaved = {} -- [player] = { Size, Transparency, Material, CanCollide, Color, Shape }
+  local hitboxCPS = 16
+  local hitboxAnimator = nil
+  local hitboxAnimConn = nil
+  local hitboxNoAnims = true
 
-  local function f8(p5)
-    if p5 and p5.Character then
-      local hrp = p5.Character:FindFirstChild("HumanoidRootPart")
-      if hrp then
-        pcall(function()
-          hrp.Size = Vector3.new(2, 2, 1)
-          hrp.Transparency = 1
-          hrp.Material = Enum.Material.Plastic
-          hrp.CanCollide = true
-          hrp.Shape = Enum.PartType.Block
-        end)
-      end
+  -- Same animation IDs PC Aura strips
+  local HITBOX_STRIP_ANIMS = {
+    ["rbxassetid://78215114906302"] = true,
+    ["rbxassetid://82990592496976"] = true,
+    ["rbxassetid://118382180791352"] = true,
+    ["rbxassetid://134836817604323"] = true,
+    ["rbxassetid://140420997560896"] = true,
+    ["rbxassetid://90109303183886"] = true,
+    ["rbxassetid://72156524420062"] = true,
+  }
+
+  local function hitboxRestore(plr)
+    if not plr or not plr.Character then return end
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+    local saved = hitboxSaved[plr]
+    if hrp and saved then
+      pcall(function()
+        hrp.Size         = saved.Size
+        hrp.Transparency = saved.Transparency
+        hrp.Material     = saved.Material
+        hrp.CanCollide   = saved.CanCollide
+        hrp.Color        = saved.Color
+        hrp.Shape        = saved.Shape
+      end)
+    end
+    hitboxSaved[plr] = nil
+  end
+
+  local function hitboxExpand(plr)
+    if not plr or not plr.Character then return end
+    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if not hitboxSaved[plr] then
+      hitboxSaved[plr] = {
+        Size         = hrp.Size,
+        Transparency = hrp.Transparency,
+        Material     = hrp.Material,
+        CanCollide   = hrp.CanCollide,
+        Color        = hrp.Color,
+        Shape        = hrp.Shape,
+      }
+    end
+    pcall(function()
+      hrp.Size         = Vector3.new(v2t.hitboxSize, v2t.hitboxSize, v2t.hitboxSize)
+      hrp.Transparency = 0.5
+      hrp.Color        = Color3.fromRGB(255, 100, 100)
+      hrp.Material     = Enum.Material.Neon
+      hrp.CanCollide   = false
+      hrp.Shape        = Enum.PartType.Ball
+    end)
+  end
+
+  local function stripHitboxAnim(track)
+    if track and track.Animation and HITBOX_STRIP_ANIMS[track.Animation.AnimationId] then
+      pcall(function() track:Stop() end)
     end
   end
 
-  runService.Heartbeat:Connect(function()
-    if not hitboxAura then return end
-    local humanoidRootPart2 = localPlayer3.Character and localPlayer3.Character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart2 then return end
-    local seen2 = {}
-    local huge = math.huge
-    local v5
-    for _, value14 in ipairs(players:GetPlayers()) do
-      if value14 ~= localPlayer3 and value14.Character then
-        local humanoidRootPart3 = value14.Character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart3 then
-          local magnitude = (humanoidRootPart2.Position - humanoidRootPart3.Position).Magnitude
-          if magnitude <= huge then huge = magnitude; v5 = value14 end
+  local function attachHitboxAnims(character)
+    if hitboxAnimConn then pcall(function() hitboxAnimConn:Disconnect() end); hitboxAnimConn = nil end
+    hitboxAnimator = nil
+    if not hitboxNoAnims or not character then return end
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    local animator = hum:FindFirstChildOfClass("Animator") or hum:WaitForChild("Animator", 3)
+    if not animator then return end
+    hitboxAnimator = animator
+    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+      stripHitboxAnim(track)
+    end
+    hitboxAnimConn = animator.AnimationPlayed:Connect(stripHitboxAnim)
+  end
+
+  local function stopHitboxAura()
+    hitboxAura = false
+    if hitboxAuraThread then
+      pcall(function() task.cancel(hitboxAuraThread) end)
+      hitboxAuraThread = nil
+    end
+    for plr in pairs(hitboxSaved) do hitboxRestore(plr) end
+    hitboxSaved = {}
+    if hitboxAnimConn then pcall(function() hitboxAnimConn:Disconnect() end); hitboxAnimConn = nil end
+    hitboxAnimator = nil
+  end
+
+  local function startHitboxAura()
+    if hitboxAuraThread then return end
+    hitboxAura = true
+
+    attachHitboxAnims(localPlayer3.Character)
+
+    hitboxAuraThread = task.spawn(function()
+      while hitboxAura do
+        local myChar = localPlayer3.Character
+        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if myHrp and myHum and myHum.Health > 0 then
+
+          -- find closest valid target within range
+          local closest, closestDist = nil, math.huge
+          for _, plr in ipairs(players:GetPlayers()) do
+            if plr ~= localPlayer3 and plr.Character then
+              local tHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+              local tHum = plr.Character:FindFirstChildOfClass("Humanoid")
+              if tHrp and tHum and tHum.Health > 0 and not isSafePlayer(plr) then
+                local d = (myHrp.Position - tHrp.Position).Magnitude
+                if d <= v2t.hitboxDistance and d < closestDist then
+                  closest = plr
+                  closestDist = d
+                end
+              end
+            end
+          end
+
+          -- also check NPCs in workspace.NPCs
+          local npCs = workspaceService:FindFirstChild("NPCs")
+          if npCs then
+            for _, npc in ipairs(npCs:GetChildren()) do
+              if npc:IsA("Model") then
+                local tHrp = npc:FindFirstChild("HumanoidRootPart")
+                local tHum = npc:FindFirstChildOfClass("Humanoid")
+                if tHrp and tHum and tHum.Health > 0 then
+                  local d = (myHrp.Position - tHrp.Position).Magnitude
+                  if d <= v2t.hitboxDistance and d < closestDist then
+                    closest = npc
+                    closestDist = d
+                  end
+                end
+              end
+            end
+          end
+
+          -- restore anyone no longer in range
+          for plr in pairs(hitboxSaved) do
+            if plr ~= closest then hitboxRestore(plr) end
+          end
+
+          -- expand closest
+          if closest then hitboxExpand(closest) end
         end
+        task.wait(1 / math.max(1, hitboxCPS))
       end
-    end
-    if v5 and v5.Character and huge <= 28 then
-      if v5.Character:FindFirstChild("HumanoidRootPart") then seen2[v5] = true; seen[v5] = true end
-    end
-    for key, _ in pairs(seen) do
-      if not seen2[key] then f8(key); seen[key] = nil end
+      hitboxAuraThread = nil
+    end)
+  end
+
+  combatDefenseTab:CreateSlider({
+    Name = "Hitbox Size",
+    Range = { 2, 35 }, Increment = 1, Suffix = " studs", CurrentValue = v2t.hitboxSize,
+    Callback = function(v) v2t.hitboxSize = v end,
+  })
+  combatDefenseTab:CreateSlider({
+    Name = "Hitbox Range",
+    Range = { 5, 100 }, Increment = 1, Suffix = " studs", CurrentValue = v2t.hitboxDistance,
+    Callback = function(v) v2t.hitboxDistance = v end,
+  })
+
+  combatDefenseTab:CreateToggle({
+    Name = "Hitbox ",
+    CurrentValue = false,
+    Callback = function(on)
+      v2t.hitboxAuraEnabled = on
+      if on then
+        startHitboxAura()
+        f3t("Hitbox Aura", "Enabled — expanding closest target's hitbox.", 3)
+      else
+        stopHitboxAura()
+        f3t("Hitbox Aura", "Disabled — hitboxes restored.", 3)
+      end
+    end,
+  })
+
+  -- restore on character respawn
+  localPlayer3.CharacterAdded:Connect(function()
+    if hitboxAura then
+      for plr in pairs(hitboxSaved) do hitboxRestore(plr) end
+      hitboxSaved = {}
+      hitboxAnimConn = nil
+      task.wait(0.5)
+      attachHitboxAnims(localPlayer3.Character)
     end
   end)
 
-  combatDefenseTab:CreateToggle({
-    Name = "Hitbox Aura",
-    CurrentValue = false,
-    Callback = function(value15)
-      hitboxAura = value15
-      v2t.hitboxAuraEnabled = value15
-      if not value15 then
-        for key2 in pairs(seen) do f8(key2); seen[key2] = nil end
-        for key3, value16 in pairs(map) do
-          if key3 and key3.Parent then
-            pcall(function()
-              key3.Size = value16.Size; key3.Transparency = value16.Transparency
-              key3.Color = value16.Color; key3.Material = value16.Material
-              key3.CanCollide = value16.CanCollide
-            end)
-          end
-          map[key3] = nil
-        end
-      end
-      f3t("Hitbox Aura", value15 and "Enabled." or "Disabled.", 3)
-    end,
-  })
+  -- restore on player leaving
+  players.PlayerRemoving:Connect(function(plr)
+    hitboxRestore(plr)
+  end)
 
   combatDefenseTab:CreateSection("Game-System Switches")
 
@@ -3665,7 +3962,7 @@ task.defer(function()
     local textChannels = textChatService:FindFirstChild("TextChannels")
     local rbxGeneral = textChannels and textChannels:FindFirstChild("RBXGeneral")
     if rbxGeneral then
-      rbxGeneral:SendAsync("➡️- LOADING TFK HUB/PAZYY -⬅️")
+      rbxGeneral:SendAsync("")
       flag12b = true
     end
   end)
