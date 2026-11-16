@@ -1,28 +1,33 @@
 --═══════════════════════════════════════════════════════════════════
--- TFK HUB — WHITELIST GATE (User ID version)
+-- TFK HUB — WHITELIST GATE (Username version)
 --═══════════════════════════════════════════════════════════════════
 
 local Players      = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer  = Players.LocalPlayer
 
--- ⚠️ EDIT: add real USER IDs here (numbers, not names)
+-- ⚠️ EDIT: add real USERNAMES here (case-insensitive)
 local WHITELIST = {
-    4579527842,    -- PAZ
-    4521138390,    -- ← GHOST
-    11964954933,    -- ← JEM
-    5345980190,          KEEM
-    3332311233,          dev
+    "TMKPAZ00",
+    "GHOST",
+    "Jemyynew0",
+    "lildurkk07",
+    "Datdudedev30",
 }
 
 --🧪 TEST FLAGS
 local FORCE_DENY = false
 local SKIP_LOAD  = false
 
+local function normalizeName(name)
+    return string.lower(name or "")
+end
+
 local function isWhitelisted(player)
     if FORCE_DENY then return false end
-    for _, allowedId in ipairs(WHITELIST) do
-        if player.UserId == allowedId then return true end
+    local name = normalizeName(player.Name)
+    for _, allowedName in ipairs(WHITELIST) do
+        if name == normalizeName(allowedName) then return true end
     end
     return false
 end
@@ -135,18 +140,18 @@ if not isWhitelisted(LocalPlayer) then
     sub.Size = UDim2.new(1, -40, 0, 28)
     sub.Position = UDim2.new(0, 20, 0, 168)
     sub.BackgroundTransparency = 1
-    sub.Text = "Your UserId: " .. LocalPlayer.UserId
+    sub.Text = "Your Username: " .. LocalPlayer.Name
     sub.TextColor3 = Color3.fromRGB(180, 180, 180)
     sub.Font = Enum.Font.Gotham
     sub.TextScaled = true
     sub.Parent = main
 
-    -- 🧪 Copy UserId button (handy for asking to be whitelisted)
+    -- 🧪 Copy Username button (handy for asking to be whitelisted)
     local copyBtn = Instance.new("TextButton")
     copyBtn.Size = UDim2.new(0, 200, 0, 34)
     copyBtn.Position = UDim2.new(0.5, -100, 1, -52)
     copyBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
-    copyBtn.Text = "📋 Copy UserId"
+    copyBtn.Text = "📋 Copy Username"
     copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     copyBtn.Font = Enum.Font.GothamBold
     copyBtn.TextSize = 15
@@ -155,10 +160,10 @@ if not isWhitelisted(LocalPlayer) then
 
     copyBtn.MouseButton1Click:Connect(function()
         if setclipboard then
-            setclipboard(tostring(LocalPlayer.UserId))
+            setclipboard(LocalPlayer.Name)
             copyBtn.Text = "✅ Copied!"
             task.delay(1.5, function()
-                if copyBtn.Parent then copyBtn.Text = "📋 Copy UserId" end
+                if copyBtn.Parent then copyBtn.Text = "📋 Copy Username" end
             end)
         end
     end)
@@ -173,6 +178,8 @@ end
 
 --═══════════════════════════════════════════════════════════════════
 -- ✅ WHITELISTED — TFK HUB CONTINUES BELOW
+--═══════════════════════════════════════════════════════════════════
+print("[TFK/PAZ] Whitelist passed for " .. LocalPlayer.Name .. " — loading hub...")
 --═══════════════════════════════════════════════════════════════════
 print("[TFK/PAZ] Whitelist passed for " .. LocalPlayer.Name .. " (" .. LocalPlayer.UserId .. ") — loading hub...")
 --═══════════════════════════════════════════════════════════════════
