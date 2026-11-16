@@ -12,6 +12,7 @@ local WHITELIST = {
     4521138390,    -- ← GHOST
     11964954933,    -- ← JEM
     5345980190,          KEEM
+    3332311233,          dev
 }
 
 --🧪 TEST FLAGS
@@ -50,7 +51,7 @@ local loadTitle = Instance.new("TextLabel")
 loadTitle.Size = UDim2.new(1, 0, 0, 60)
 loadTitle.Position = UDim2.new(0, 0, 0.5, -50)
 loadTitle.BackgroundTransparency = 1
-loadTitle.Text = "LOADING TFK/PAZ SCRIPT..."
+loadTitle.Text = "LOADING TFK/PAZ/JEM SCRIPT..."
 loadTitle.TextColor3 = Color3.fromRGB(0, 255, 150)
 loadTitle.Font = Enum.Font.GothamBold
 loadTitle.TextScaled = true
