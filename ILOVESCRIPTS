@@ -892,7 +892,7 @@ do -- PVP & Carry Spam Tab
   toxicMessages = {
     "Pov: I was literally playing with one hand there | TFKV3", "You are actually so ez it is funny | TFKV3",
     "Oh my bad thought you was afk 🥀 | TFKV3", "Hold that L bro you are ez | TFKV3",
-    "im not even trying and your still losing | TFKv3", "Pov: you use TFK scripts 👑",
+    "Im not even trying and ur still losing | TFKv3", "Pov: you use TFK scripts 👑",
   }
   toxicSpamActive = false
   toxicSpamThread = nil
@@ -1081,6 +1081,81 @@ do -- PVP & Carry Spam Tab
       end
     end,
   })
+
+-- ═══════════════════════════════════════════════════════════════
+  -- ANNOUNCEMENT & DETENTION (Paz Hub)
+  -- ═══════════════════════════════════════════════════════════════
+  
+  local AnnouncementRequest = replicatedStorage:FindFirstChild("AnnouncementRequest")
+  local DetentionRequest = replicatedStorage:FindFirstChild("DetentionRequest")
+
+  tab2:CreateSection("Announcement System")
+
+  local announcementText = "Announce Here"
+
+  tab2:CreateInput({
+      Name = "Announcement Message",
+      PlaceholderText = "Type your message here...",
+      CurrentValue = announcementText,
+      RemoveTextAfterFocusLost = false,
+      Callback = function(text)
+          announcementText = text
+      end,
+  })
+
+  tab2:CreateButton({
+      Name = "Send Announcement",
+      Callback = function()
+          if not AnnouncementRequest then
+              return result2:Notify({ Title = "Error", Content = "Remote not found.", Duration = 3 })
+          end
+          if announcementText == "" then
+              return result2:Notify({ Title = "Error", Content = "Message cannot be empty.", Duration = 3 })
+          end
+          
+          pcall(function()
+              AnnouncementRequest:FireServer(announcementText)
+          end)
+          
+          result2:Notify({
+              Title = "Sent",
+              Content = "Announcement: " .. announcementText,
+              Duration = 3,
+          })
+      end,
+  })
+
+  -- ═══════════════════════════════════════════════════════════════
+  -- DETENTION LOOP
+  -- ═══════════════════════════════════════════════════════════════
+  local DetentionLooping = false
+
+  tab2:CreateSection("Detention")
+
+  tab2:CreateToggle({
+      Name = "Loop Detention on Everyone",
+      CurrentValue = false,
+      Callback = function(state)
+          DetentionLooping = state
+          if DetentionLooping then
+              task.spawn(function()
+                  while DetentionLooping do
+                      if DetentionRequest then
+                          for _, p in ipairs(players:GetPlayers()) do
+                              if p ~= localPlayer then
+                                  pcall(function()
+                                      DetentionRequest:FireServer(p, "Breaking Rules")
+                                  end)
+                              end
+                          end
+                      end
+                      task.wait(0.1)
+                  end
+              end)
+              result2:Notify({ Title = "Detention", Content = "Looping detention on everyone.", Duration = 3 })
+          end
+      end,
+  })
 end
 
 do -- Combat & Defense Tab
@@ -1143,6 +1218,299 @@ do -- Combat & Defense Tab
     Range = {1, 20}, Increment = 1, Suffix = " studs", CurrentValue = 4,
     Callback = function(v) CONFIG.ShieldPushDistance = v end,
   })
+
+-- ═══════════════════════════════════════════════════════════════
+  -- AUTO GRAB FARMER (Built-in PC Aura Logic - Fixed)
+  -- ═══════════════════════════════════════════════════════════════
+  combatDefenseTab:CreateSection("Auto Grab Farmer")
+
+  local CONFIG_Farmer = {
+      ClickCPS = 15, -- 🎯 Perfect speed (not too fast, not too slow)
+      TeleportOffset = 3,
+      WaitAfterGrab = 5,
+      GymCenter = Vector3.new(65.89, 5.01, -11.90),
+      GymX = 56, 
+      GymZ = 103,
+      ShiftX = 34 
+  }
+
+  local isFarming = false
+  local isWaitingForEmpty = false
+  local waitUntilTime = 0
+  local farmThread = nil
+  local hitboxThread = nil 
+  local statusText = "Status: Idle"
+  local lastGrabSpot = nil
+  local recentlyHit = {}
+  local farmerHitboxes = {}
+
+  local farmerStatusLabel = combatDefenseTab:CreateParagraph({ Title = "Live Status", Content = statusText })
+
+  -- Built-in Clicker
+  local function farmerClick()
+      local cam = workspaceService.CurrentCamera
+      if not cam then return end
+      local vp = cam.ViewportSize
+      local x = math.floor(vp.X / 2)
+      local y = math.floor(vp.Y / 2)
+      pcall(function() virtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1) end)
+      task.wait(0.01)
+      pcall(function() virtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1) end)
+  end
+
+  -- Built-in Hitbox Logic
+  local function expandFarmerHitbox(plr)
+      if not plr or not plr.Character then return end
+      local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+      if not hrp then return end
+      if not farmerHitboxes[plr] then
+          farmerHitboxes[plr] = {
+              Size = hrp.Size, Transparency = hrp.Transparency,
+              Material = hrp.Material, CanCollide = hrp.CanCollide,
+              Color = hrp.Color, Shape = hrp.Shape,
+          }
+      end
+      pcall(function()
+          hrp.Size = Vector3.new(25, 25, 25)
+          hrp.Transparency = 0.5
+          hrp.Color = Color3.fromRGB(255, 100, 100)
+          hrp.Material = Enum.Material.Neon
+          hrp.CanCollide = false
+          hrp.Shape = Enum.PartType.Ball
+      end)
+  end
+
+  local function restoreFarmerHitbox(plr)
+      if not plr or not plr.Character then return end
+      local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+      local saved = farmerHitboxes[plr]
+      if hrp and saved then
+          pcall(function()
+              hrp.Size = saved.Size
+              hrp.Transparency = saved.Transparency
+              hrp.Material = saved.Material
+              hrp.CanCollide = saved.CanCollide
+              hrp.Color = saved.Color
+              hrp.Shape = saved.Shape
+          end)
+      end
+      farmerHitboxes[plr] = nil
+  end
+
+  local function restoreAllFarmerHitboxes()
+      for plr in pairs(farmerHitboxes) do
+          restoreFarmerHitbox(plr)
+      end
+  end
+
+  local function startFarm()
+      if farmThread then task.cancel(farmThread) end
+      if hitboxThread then task.cancel(hitboxThread) end
+      
+      isFarming = true
+      isWaitingForEmpty = false
+      waitUntilTime = 0
+      statusText = "Status: Hunting..."
+      recentlyHit = {}
+      restoreAllFarmerHitboxes()
+
+      -- 📦 Hitbox Loop
+      hitboxThread = task.spawn(function()
+          while isFarming do
+              if not isWaitingForEmpty then
+                  for _, plr in ipairs(players:GetPlayers()) do
+                      if plr ~= localPlayer and plr.Character then
+                          local tHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                          local tHum = plr.Character:FindFirstChildOfClass("Humanoid")
+                          if tHrp and tHum and tHum.Health > 0 then
+                              local pos = tHrp.Position
+                              local inBox = false
+                              local boxCenterX = CONFIG_Farmer.GymCenter.X + CONFIG_Farmer.ShiftX
+                              
+                              if math.abs(pos.X - boxCenterX) <= (CONFIG_Farmer.GymX / 2) and
+                                 math.abs(pos.Z - CONFIG_Farmer.GymCenter.Z) <= (CONFIG_Farmer.GymZ / 2) then
+                                  inBox = true
+                              end
+
+                              if inBox then
+                                  expandFarmerHitbox(plr)
+                              else
+                                  restoreFarmerHitbox(plr)
+                              end
+                          end
+                      end
+                  end
+              end
+              task.wait(0.1) 
+          end
+      end)
+
+      -- 🏃 Teleport & Click Loop (Balanced Speed)
+      farmThread = task.spawn(function()
+          while isFarming do
+              if not isWaitingForEmpty and tick() >= waitUntilTime then
+                  local myChar = localPlayer.Character
+                  local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                  
+                  if myHrp then
+                      local validTargets = {}
+                      for _, plr in ipairs(players:GetPlayers()) do
+                          if plr ~= localPlayer and plr.Character then
+                              local tHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                              local tHum = plr.Character:FindFirstChildOfClass("Humanoid")
+                              
+                              if tHrp and tHum and tHum.Health > 0 then
+                                  local pos = tHrp.Position
+                                  local inBox = false
+                                  local boxCenterX = CONFIG_Farmer.GymCenter.X + CONFIG_Farmer.ShiftX
+                                  
+                                  if math.abs(pos.X - boxCenterX) <= (CONFIG_Farmer.GymX / 2) and
+                                     math.abs(pos.Z - CONFIG_Farmer.GymCenter.Z) <= (CONFIG_Farmer.GymZ / 2) then
+                                      inBox = true
+                                  end
+
+                                  if inBox and not recentlyHit[plr] then
+                                      table.insert(validTargets, plr)
+                                  end
+                              end
+                          end
+                      end
+
+                      if #validTargets > 0 then
+                          local chosen = validTargets[math.random(1, #validTargets)]
+                          local tHrp = chosen.Character:FindFirstChild("HumanoidRootPart")
+                          
+                          if tHrp then
+                              statusText = "Status: Hitting " .. chosen.Name
+                              
+                              local dest = tHrp.Position - (tHrp.CFrame.LookVector * CONFIG_Farmer.TeleportOffset)
+                              myHrp.CFrame = CFrame.lookAt(dest, tHrp.Position)
+                              myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                              
+                              lastGrabSpot = myHrp.CFrame
+                              
+                              -- ⏱️ Small pause to let the game register the teleport
+                              task.wait(0.13) 
+                              
+                              farmerClick()
+                              
+                              recentlyHit[chosen] = true
+                              task.delay(1, function()
+                                  recentlyHit[chosen] = nil
+                              end)
+                          end
+                      else
+                          statusText = "Status: No targets in gym..."
+                      end
+                  end
+              end
+              task.wait(1 / CONFIG_Farmer.ClickCPS) 
+          end
+      end)
+  end
+
+  local function stopFarm()
+      isFarming = false
+      isWaitingForEmpty = false
+      waitUntilTime = 0
+      if farmThread then
+          pcall(function() task.cancel(farmThread) end)
+          farmThread = nil
+      end
+      if hitboxThread then
+          pcall(function() task.cancel(hitboxThread) end)
+          hitboxThread = nil
+      end
+      recentlyHit = {}
+      
+      -- 🧹 Guarantee hitboxes get restored even if we toggle off mid-loop
+      task.wait(0.1) 
+      restoreAllFarmerHitboxes() 
+      
+      statusText = "Status: Idle"
+  end
+
+  local grabConnection
+  local function setupGrabListener()
+      if grabConnection then grabConnection:Disconnect() end
+      grabConnection = localPlayer:GetAttributeChangedSignal("GrabPower"):Connect(function()
+          if not isFarming then return end
+          local grabPower = localPlayer:GetAttribute("GrabPower") or 0
+          
+          if grabPower >= 100 and not isWaitingForEmpty then
+              isWaitingForEmpty = true
+              restoreAllFarmerHitboxes() 
+              
+              if lastGrabSpot then
+                  local myChar = localPlayer.Character
+                  local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                  if myHrp then
+                      myHrp.CFrame = lastGrabSpot
+                      myHrp.AssemblyLinearVelocity = Vector3.new(0, -1, 0)
+                  end
+              end
+              statusText = "Status: Grab Full! Waiting..."
+          end
+          
+          if grabPower <= 0 and isWaitingForEmpty then
+              isWaitingForEmpty = false
+              waitUntilTime = tick() + CONFIG_Farmer.WaitAfterGrab
+              statusText = "Status: Finishing grab animation..."
+          end
+      end)
+  end
+
+  -- Backup Checker
+  task.spawn(function()
+      while true do
+          task.wait(0.2) 
+          if isFarming then
+              local grabPower = localPlayer:GetAttribute("GrabPower") or 0
+              if grabPower >= 100 and not isWaitingForEmpty then
+                  isWaitingForEmpty = true
+                  restoreAllFarmerHitboxes()
+                  if lastGrabSpot then
+                      local myChar = localPlayer.Character
+                      local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                      if myHrp then
+                          myHrp.CFrame = lastGrabSpot
+                          myHrp.AssemblyLinearVelocity = Vector3.new(0, -1, 0)
+                      end
+                  end
+                  statusText = "Status: Grab Full! Waiting..."
+              end
+          end
+      end
+  end)
+
+  combatDefenseTab:CreateToggle({
+      Name = "Auto Farm Grab (Built-in Clicker)",
+      CurrentValue = false,
+      Callback = function(on)
+          if on then
+              local myChar = localPlayer.Character
+              local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+              if myHrp then lastGrabSpot = myHrp.CFrame end
+              
+              startFarm()
+              setupGrabListener()
+              f3t("Auto Farm", "Started!", 3)
+          else
+              if grabConnection then grabConnection:Disconnect() end
+              stopFarm()
+              f3t("Auto Farm", "Stopped.", 3)
+          end
+      end,
+  })
+
+  task.spawn(function()
+      while true do
+          task.wait(0.5)
+          if farmerStatusLabel and farmerStatusLabel.Set then
+              pcall(function() farmerStatusLabel:Set({ Title = "Live Status", Content = statusText }) end)
+          end
+      end
+  end)
 
   combatDefenseTab:CreateSection("PC Aura (Auto-Clicker Synced)")
 
@@ -1804,7 +2172,7 @@ combatDefenseTab:CreateSection("Hitbox")
     Callback = function(value21) v2t.noSlowEnabled = value21; f3t("No Slow", value21 and "Enabled." or "Disabled.", 3) end,
   })
 
-  combatDefenseTab:CreateToggle({
+combatDefenseTab:CreateToggle({
     Name = "Anti Ragdoll",
     CurrentValue = false,
     Callback = function(value22)
