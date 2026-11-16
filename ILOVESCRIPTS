@@ -2172,13 +2172,52 @@ combatDefenseTab:CreateSection("Hitbox")
     Callback = function(value21) v2t.noSlowEnabled = value21; f3t("No Slow", value21 and "Enabled." or "Disabled.", 3) end,
   })
 
-combatDefenseTab:CreateToggle({
-    Name = "Anti Ragdoll",
-    CurrentValue = false,
-    Callback = function(value22)
-      v2t.antiRagdollEnabled = value22
-      f3t("Anti Ragdoll", value22 and "Enabled locally." or "Disabled.", 4)
-    end,
+-- ═══════════════════════════════════════════════════════════════
+  -- ANTI RAGDOLL
+  -- ═══════════════════════════════════════════════════════════════
+  combatDefenseTab:CreateSection("Anti Ragdoll")
+
+  local antiRagdollEnabled = false
+  local antiRagdollConnection = nil
+
+  combatDefenseTab:CreateToggle({
+      Name = "Anti Ragdoll",
+      CurrentValue = false,
+      Callback = function(state)
+          antiRagdollEnabled = state
+          
+          if antiRagdollEnabled then
+              if antiRagdollConnection then antiRagdollConnection:Disconnect() end
+              
+              antiRagdollConnection = runService.Heartbeat:Connect(function()
+                  local char = localPlayer.Character
+                  if not char then return end
+                  
+                  local hum = char:FindFirstChildOfClass("Humanoid")
+                  if not hum then return end
+                  
+                  -- If we are ragdolled, force us out of it
+                  if hum.PlatformStand or hum:GetState() == Enum.HumanoidStateType.Physics or hum:GetState() == Enum.HumanoidStateType.Ragdoll then
+                      
+                      -- 1. Disable platform stand
+                      hum.PlatformStand = false
+                      
+                      -- 2. Force the Humanoid to get back up
+                      if hum:GetState() ~= Enum.HumanoidStateType.GettingUp then
+                          hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                      end
+                  end
+              end)
+              
+              f3t("Anti Ragdoll", "Enabled.", 3)
+          else
+              if antiRagdollConnection then
+                  antiRagdollConnection:Disconnect()
+                  antiRagdollConnection = nil
+              end
+              f3t("Anti Ragdoll", "Disabled.", 3)
+          end
+      end,
   })
 end
 
