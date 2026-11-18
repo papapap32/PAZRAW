@@ -937,7 +937,7 @@ do -- PVP & Carry Spam Tab
   tab2:CreateButton({
     Name = "Open Grabber GUI",
     Callback = function()
-      loadstring(game:HttpGet("https://raw.githubusercontent.com/girhubsccountv-hue/random-useless-stuff/refs/heads/main/tuffstufff"))()
+      loadstring(Game:httpGet("https://raw.githubusercontent.com/papapap32/Paz-Grab-Tracker-Omfg-blabla/refs/heads/main/Paz-Grab-Tracker"))()
     end,
   })
 
@@ -2251,27 +2251,144 @@ do -- Movement & Anti Hit Tab
     end,
   })
 
-  tab2m:CreateSection("Orbit")
-  tab2m:CreateInput({
-    Name = "Orbit Target", PlaceholderText = "Player name or NPC in workspace.NPCs",
-    CurrentValue = "", RemoveTextAfterFocusLost = false,
-    Callback = function(value28) v2t.orbitTarget = value28 end,
+  tab2m:CreateSection("Paz Orbitter")
+
+  local orbiting = false
+  local orbitSpeed = 500
+  local orbitRadius = 3
+  local orbitConnection = nil
+  local currentTarget = nil
+  local orbitHrp = nil
+
+  local function findPlayerByPartial(input)
+      if input == nil or input == "" then return nil end
+      local lowerInput = string.lower(input)
+      for _, p in pairs(players:GetPlayers()) do
+          if p ~= localPlayer then
+              local name = string.lower(p.Name)
+              local display = string.lower(p.DisplayName)
+              if string.find(name, lowerInput, 1, true) or string.find(display, lowerInput, 1, true) then
+                  return p
+              end
+          end
+      end
+      return nil
+  end
+
+  local function getTargetRootPart(targetPlayer)
+      if targetPlayer and targetPlayer.Character then
+          return targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+      end
+      return nil
+  end
+
+  local function updateTargetFromInput(inputText)
+      local targetPlayer = findPlayerByPartial(inputText)
+      if targetPlayer then
+          local rootPart = getTargetRootPart(targetPlayer)
+          if rootPart then
+              currentTarget = rootPart
+              return true
+          end
+      end
+      currentTarget = nil
+      return false
+  end
+
+  local function startOrbitLoop()
+      if orbitConnection then orbitConnection:Disconnect() end
+      orbitConnection = runService.RenderStepped:Connect(function()
+          if not orbiting then return end
+          if not orbitHrp or not orbitHrp.Parent then
+              orbiting = false
+              if orbitConnection then orbitConnection:Disconnect() end
+              return
+          end
+          if not currentTarget or not currentTarget.Parent then
+              orbiting = false
+              if orbitConnection then orbitConnection:Disconnect() end
+              return
+          end
+          local angle = tick() * orbitSpeed
+          local offset = Vector3.new(math.cos(angle) * orbitRadius, 0, math.sin(angle) * orbitRadius)
+          local orbitPos = currentTarget.Position + offset
+          orbitHrp.CFrame = CFrame.lookAt(orbitPos, currentTarget.Position)
+          
+          local targetHumanoid = currentTarget.Parent:FindFirstChild("Humanoid")
+          if targetHumanoid then
+              workspaceService.CurrentCamera.CameraSubject = targetHumanoid
+          end
+      end)
+  end
+
+  local function stopOrbit()
+      orbiting = false
+      if orbitConnection then 
+          orbitConnection:Disconnect() 
+          orbitConnection = nil
+      end
+      local myChar = localPlayer.Character
+      if myChar then
+          workspaceService.CurrentCamera.CameraSubject = myChar:FindFirstChild("Humanoid")
+      end
+      f3t("Orbit", "Stopped", 3)
+  end
+
+  local targetInput = tab2m:CreateInput({
+      Name = "Orbit Target",
+      PlaceholderText = "Enter username or display name",
+      CurrentValue = "",
+      RemoveTextAfterFocusLost = false,
+      Callback = function(txt)
+          updateTargetFromInput(txt)
+      end,
   })
+
   tab2m:CreateSlider({
-    Name = "Orbit Distance", Range = { 2, 25 }, Increment = 1, Suffix = " studs",
-    CurrentValue = v2t.orbitDistance, Callback = function(value29) v2t.orbitDistance = value29 end,
+      Name = "Orbit Distance (Radius)",
+      Range = { 1, 12 },
+      Increment = 1,
+      Suffix = " studs",
+      CurrentValue = orbitRadius,
+      Callback = function(val)
+          orbitRadius = val
+      end,
   })
-  tab2m:CreateSlider({
-    Name = "Orbit Speed", Range = { 1, 10 }, Increment = 1, Suffix = "x",
-    CurrentValue = v2t.orbitSpeed, Callback = function(value30) v2t.orbitSpeed = value30 end,
-  })
+
   tab2m:CreateToggle({
-    Name = "Orbit", CurrentValue = false,
-    Callback = function(value31)
-      v2t.orbitEnabled = value31
-      if value31 then v2t.followEnabled = false; f3t("Orbit", "Orbiting.") else f3t("Orbit", "Stopped.") end
-    end,
+      Name = "Paz Orbitter",
+      CurrentValue = false,
+      Callback = function(state)
+          orbiting = state
+          if orbiting then
+              local myChar = localPlayer.Character
+              orbitHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+              
+              if not currentTarget or not currentTarget.Parent then
+                  if targetInput and targetInput.Text ~= "" then
+                      updateTargetFromInput(targetInput.Text)
+                  end
+              end
+              
+              if currentTarget and currentTarget.Parent and orbitHrp then
+                  startOrbitLoop()
+                  f3t("Orbit", "Started", 3)
+              else
+                  orbiting = false
+                  f3t("Orbit", "No valid target found.", 3)
+              end
+          else
+              stopOrbit()
+          end
+      end,
   })
+
+  localPlayer.CharacterAdded:Connect(function(char)
+      orbitHrp = char:WaitForChild("HumanoidRootPart")
+      if orbiting then
+          startOrbitLoop()
+      end
+  end) 
 
   tab2m:CreateSection("Hit TP")
   tab2m:CreateInput({
